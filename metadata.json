@@ -1,0 +1,6 @@
+{
+  "name": "Control de Entrega de PC - Sala de Programación",
+  "description": "Sistema y API en tiempo real para control de entrega de computadoras en la sala de programación con historial, incidencias, alertas de mantenimiento preventivo y reportes en PDF.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
