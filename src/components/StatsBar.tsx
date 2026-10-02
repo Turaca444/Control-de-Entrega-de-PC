@@ -49,9 +49,22 @@ export const StatsBar: React.FC<StatsBarProps> = ({ stats, onFilterStatus }) => 
           <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
             Disponibles
           </span>
-          <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
-            {stats.availableComputers}
-          </span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+              {stats.availableComputers}
+            </span>
+            <span className="text-[10px] font-medium text-emerald-700/80 dark:text-emerald-400/80">
+              libres
+            </span>
+          </div>
+          {stats.availablePcNumbers && stats.availablePcNumbers.length > 0 && (
+            <span
+              className="text-[10px] font-mono text-emerald-700 dark:text-emerald-300 block truncate max-w-[140px] font-semibold"
+              title={`PCs disponibles: ${stats.availablePcNumbers.join(', ')}`}
+            >
+              {stats.availablePcNumbers.join(', ')}
+            </span>
+          )}
         </div>
       </div>
 

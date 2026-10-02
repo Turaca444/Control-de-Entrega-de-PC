@@ -95,6 +95,59 @@ var DEFAULT_USER_PROFILES = [
     avatarColor: "from-red-600 to-amber-700"
   }
 ];
+var DEFAULT_COMPUTERS = Array.from({ length: 25 }, (_, i) => {
+  const num = i + 1;
+  const pad = num < 10 ? `0${num}` : `${num}`;
+  const pcNumber = `PC-${pad}`;
+  const rowLetters = ["A", "B", "C", "D", "E"];
+  const rowIndex = Math.floor(i / 5);
+  const seatIndex = i % 5 + 1;
+  const rowLetter = rowLetters[rowIndex] || "E";
+  const locationRow = `Fila ${rowLetter} - Puesto 0${seatIndex}`;
+  let model = "Dell OptiPlex 7090 Tower";
+  let processor = "Intel Core i7-11700 (8C/16T, 2.50 GHz)";
+  let ram = "16 GB DDR4 3200MHz";
+  let storage = "512 GB NVMe M.2 SSD";
+  const os = "Dual Boot: Ubuntu 24.04 LTS / Windows 11 Pro";
+  if (rowLetter === "B") {
+    model = "Lenovo ThinkCentre M70s Gen 3";
+    processor = "Intel Core i5-12500 (6C/12T, 3.00 GHz)";
+    ram = "16 GB DDR4 3200MHz";
+    storage = "512 GB PCIe M.2 SSD";
+  } else if (rowLetter === "C") {
+    model = "HP ProDesk 600 G6 Microtower";
+    processor = "AMD Ryzen 7 PRO 4750G (8C/16T, 3.60 GHz)";
+    ram = "32 GB DDR4 3200MHz";
+    storage = "1 TB NVMe SSD";
+  } else if (rowLetter === "D") {
+    model = "Dell OptiPlex 7090 Tower";
+    processor = "Intel Core i7-11700 (8C/16T, 2.50 GHz)";
+    ram = "16 GB DDR4 3200MHz";
+    storage = "512 GB NVMe M.2 SSD";
+  } else if (rowLetter === "E") {
+    model = "HP ProDesk 600 G6 Microtower";
+    processor = "Intel Core i7-10700 (8C/16T, 2.90 GHz)";
+    ram = "16 GB DDR4 3200MHz";
+    storage = "512 GB NVMe SSD";
+  }
+  const isAssigned = i < 19;
+  return {
+    id: pcNumber,
+    pcNumber,
+    model,
+    processor,
+    ram,
+    storage,
+    os,
+    status: isAssigned ? "en_uso" : "disponible",
+    locationRow,
+    lastMaintenanceDate: "2026-03-01T08:00:00.000Z",
+    totalLoansCount: isAssigned ? 15 + i % 7 : 4 + i % 3,
+    totalUsageHours: isAssigned ? 45 + i * 2 : 12 + i,
+    healthScore: isAssigned ? 95 - i % 6 : 99,
+    notes: "Configurado con IDEs de programaci\xF3n (VS Code, Python, GCC, Node.js)"
+  };
+});
 
 // server/store.ts
 var DATA_DIR = path.join(process.cwd(), "data");
@@ -304,8 +357,30 @@ var DatabaseStore = class {
     }
   }
   // --- Computers ---
-  getComputers() {
+  getComputers(filterStatus) {
+    if (!this.data.computers || !Array.isArray(this.data.computers) || this.data.computers.length === 0) {
+      this.data.computers = DEFAULT_COMPUTERS;
+      this.save();
+    }
+    const activePcNumbers = new Set(
+      (this.data.deliveries || []).filter((d) => d.status === "activo" && !d.pcNumber.startsWith("SOLO-")).map((d) => d.pcNumber)
+    );
+    for (const comp of this.data.computers) {
+      if (comp.status !== "en_reparacion" && comp.status !== "mantenimiento" && comp.status !== "de_baja") {
+        comp.status = activePcNumbers.has(comp.pcNumber) ? "en_uso" : "disponible";
+      }
+    }
+    if (filterStatus) {
+      const lower = filterStatus.toLowerCase();
+      if (lower === "disponible" || lower === "available" || lower === "libres") {
+        return this.data.computers.filter((c) => c.status === "disponible");
+      }
+      return this.data.computers.filter((c) => c.status.toLowerCase() === lower);
+    }
     return this.data.computers;
+  }
+  getAvailablePcNumbers() {
+    return this.getComputers("disponible").map((c) => c.pcNumber);
   }
   getComputerById(id) {
     return this.data.computers.find((c) => c.id === id || c.pcNumber === id);
@@ -855,19 +930,26 @@ var DatabaseStore = class {
   }
   // --- Stats ---
   getStats() {
-    const totalComputers = this.data.computers.length;
-    const availableComputers = this.data.computers.filter((c) => c.status === "disponible").length;
-    const inUseComputers = this.data.computers.filter((c) => c.status === "en_uso").length;
-    const inMaintenanceComputers = this.data.computers.filter((c) => c.status === "mantenimiento").length;
-    const inRepairComputers = this.data.computers.filter((c) => c.status === "en_reparacion").length;
-    const activeDeliveriesCount = this.data.deliveries.filter((d) => d.status === "activo").length;
-    const pendingAlertsCount = this.data.maintenanceAlerts.filter((a) => a.status === "activa").length;
+    const computers = this.getComputers();
+    const totalComputers = computers.length;
+    const availableComputersList = computers.filter((c) => c.status === "disponible");
+    const availableComputers = availableComputersList.length;
+    const availablePcNumbers = availableComputersList.map((c) => c.pcNumber);
+    const inUseComputersList = computers.filter((c) => c.status === "en_uso");
+    const inUseComputers = inUseComputersList.length;
+    const inUsePcNumbers = inUseComputersList.map((c) => c.pcNumber);
+    const inMaintenanceComputers = computers.filter((c) => c.status === "mantenimiento").length;
+    const inRepairComputers = computers.filter((c) => c.status === "en_reparacion").length;
+    const activeDeliveriesCount = (this.data.deliveries || []).filter((d) => d.status === "activo").length;
+    const pendingAlertsCount = (this.data.maintenanceAlerts || []).filter((a) => a.status === "activa").length;
     const todayStr = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-    const totalLoansToday = this.data.deliveries.filter((d) => d.deliveryDate.startsWith(todayStr)).length;
+    const totalLoansToday = (this.data.deliveries || []).filter((d) => d.deliveryDate.startsWith(todayStr)).length;
     return {
       totalComputers,
       availableComputers,
+      availablePcNumbers,
       inUseComputers,
+      inUsePcNumbers,
       inMaintenanceComputers,
       inRepairComputers,
       activeDeliveriesCount,

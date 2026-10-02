@@ -63,12 +63,36 @@ async function startServer() {
 
   // 2. Stats
   app.get('/api/stats', (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.json(dbStore.getStats());
   });
 
   // 3. Computers
+  // Available computers dedicated endpoints
+  const handleAvailableComputers = (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const availableComputers = dbStore.getComputers('disponible');
+    const availablePcNumbers = availableComputers.map((c) => c.pcNumber);
+    res.json({
+      count: availableComputers.length,
+      availablePcNumbers,
+      computers: availableComputers,
+    });
+  };
+
+  app.get('/api/computers/available', handleAvailableComputers);
+  app.get('/api/computers/disponibles', handleAvailableComputers);
+  app.get('/api/available-pcs', handleAvailableComputers);
+
   app.get('/api/computers', (req: Request, res: Response) => {
-    res.json(dbStore.getComputers());
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const status = req.query.status as string | undefined;
+    const onlyAvailable = req.query.available === 'true';
+    if (status || onlyAvailable) {
+      res.json(dbStore.getComputers(status || 'disponible'));
+    } else {
+      res.json(dbStore.getComputers());
+    }
   });
 
   app.get('/api/computers/:id', (req: Request, res: Response) => {

@@ -29,6 +29,7 @@ import {
   LAB_MOUSE_CODES,
   DEFAULT_MOUSE_BRAND,
   COMMON_MOUSE_BRANDS,
+  DEFAULT_COMPUTERS,
 } from '../types';
 import { ConfirmModal } from './ConfirmModal';
 
@@ -162,11 +163,15 @@ export const NewDeliveryModal: React.FC<NewDeliveryModalProps> = ({
 
   if (!isOpen) return null;
 
-  const availableComputers = computers.filter(
+  const computersList = (computers && Array.isArray(computers) && computers.length > 0)
+    ? computers
+    : DEFAULT_COMPUTERS;
+
+  const availableComputers = computersList.filter(
     (c) => c.status === 'disponible' || c.status === 'mantenimiento'
   );
 
-  const selectedComp = computers.find((c) => c.pcNumber === pcNumber);
+  const selectedComp = computersList.find((c) => c.pcNumber === pcNumber);
 
   const courseStudents = studentId ? studentsByCourseMap[studentId] || [] : [];
 
@@ -817,8 +822,43 @@ export const NewDeliveryModal: React.FC<NewDeliveryModalProps> = ({
                   </span>
                 </div>
 
+                {/* Available PCs direct selection bar */}
+                <div className="mb-2.5 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>{availableComputers.length} Computadoras Disponibles para entrega:</span>
+                    </span>
+                    <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-semibold">
+                      (Clic para seleccionar al instante)
+                    </span>
+                  </div>
+                  {availableComputers.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {availableComputers.map((c) => (
+                        <button
+                          key={c.pcNumber}
+                          type="button"
+                          onClick={() => handleSelectPC(c.pcNumber)}
+                          className={`px-2.5 py-1 rounded-md text-xs font-mono font-bold transition-all cursor-pointer ${
+                            pcNumber === c.pcNumber
+                              ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-400'
+                              : 'bg-white dark:bg-slate-900 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/60'
+                          }`}
+                        >
+                          {c.pcNumber}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                      No hay computadoras libres en este momento (todas se encuentran prestadas o en mantenimiento).
+                    </p>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
-                  {computers.map((c) => {
+                  {computersList.map((c) => {
                     const isSelected = pcNumber === c.pcNumber;
                     const isBusy = c.status === 'en_uso';
                     const isBroken = c.status === 'en_reparacion' || c.status === 'de_baja';

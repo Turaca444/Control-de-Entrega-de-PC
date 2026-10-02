@@ -9,6 +9,7 @@ import {
   AdminNotification,
   UserProfile,
   DEFAULT_USER_PROFILES,
+  DEFAULT_COMPUTERS,
 } from '../src/types.js';
 
 interface DatabaseSchema {
@@ -258,8 +259,38 @@ export class DatabaseStore {
   }
 
   // --- Computers ---
-  public getComputers(): Computer[] {
+  public getComputers(filterStatus?: string): Computer[] {
+    if (!this.data.computers || !Array.isArray(this.data.computers) || this.data.computers.length === 0) {
+      this.data.computers = DEFAULT_COMPUTERS;
+      this.save();
+    }
+
+    // Ensure computer statuses reflect active deliveries accurately
+    const activePcNumbers = new Set(
+      (this.data.deliveries || [])
+        .filter((d) => d.status === 'activo' && !d.pcNumber.startsWith('SOLO-'))
+        .map((d) => d.pcNumber)
+    );
+
+    for (const comp of this.data.computers) {
+      if (comp.status !== 'en_reparacion' && comp.status !== 'mantenimiento' && comp.status !== 'de_baja') {
+        comp.status = activePcNumbers.has(comp.pcNumber) ? 'en_uso' : 'disponible';
+      }
+    }
+
+    if (filterStatus) {
+      const lower = filterStatus.toLowerCase();
+      if (lower === 'disponible' || lower === 'available' || lower === 'libres') {
+        return this.data.computers.filter((c) => c.status === 'disponible');
+      }
+      return this.data.computers.filter((c) => c.status.toLowerCase() === lower);
+    }
+
     return this.data.computers;
+  }
+
+  public getAvailablePcNumbers(): string[] {
+    return this.getComputers('disponible').map((c) => c.pcNumber);
   }
 
   public getComputerById(id: string): Computer | undefined {
@@ -975,21 +1006,28 @@ export class DatabaseStore {
 
   // --- Stats ---
   public getStats() {
-    const totalComputers = this.data.computers.length;
-    const availableComputers = this.data.computers.filter((c) => c.status === 'disponible').length;
-    const inUseComputers = this.data.computers.filter((c) => c.status === 'en_uso').length;
-    const inMaintenanceComputers = this.data.computers.filter((c) => c.status === 'mantenimiento').length;
-    const inRepairComputers = this.data.computers.filter((c) => c.status === 'en_reparacion').length;
-    const activeDeliveriesCount = this.data.deliveries.filter((d) => d.status === 'activo').length;
-    const pendingAlertsCount = this.data.maintenanceAlerts.filter((a) => a.status === 'activa').length;
+    const computers = this.getComputers();
+    const totalComputers = computers.length;
+    const availableComputersList = computers.filter((c) => c.status === 'disponible');
+    const availableComputers = availableComputersList.length;
+    const availablePcNumbers = availableComputersList.map((c) => c.pcNumber);
+    const inUseComputersList = computers.filter((c) => c.status === 'en_uso');
+    const inUseComputers = inUseComputersList.length;
+    const inUsePcNumbers = inUseComputersList.map((c) => c.pcNumber);
+    const inMaintenanceComputers = computers.filter((c) => c.status === 'mantenimiento').length;
+    const inRepairComputers = computers.filter((c) => c.status === 'en_reparacion').length;
+    const activeDeliveriesCount = (this.data.deliveries || []).filter((d) => d.status === 'activo').length;
+    const pendingAlertsCount = (this.data.maintenanceAlerts || []).filter((a) => a.status === 'activa').length;
 
     const todayStr = new Date().toISOString().split('T')[0];
-    const totalLoansToday = this.data.deliveries.filter((d) => d.deliveryDate.startsWith(todayStr)).length;
+    const totalLoansToday = (this.data.deliveries || []).filter((d) => d.deliveryDate.startsWith(todayStr)).length;
 
     return {
       totalComputers,
       availableComputers,
+      availablePcNumbers,
       inUseComputers,
+      inUsePcNumbers,
       inMaintenanceComputers,
       inRepairComputers,
       activeDeliveriesCount,

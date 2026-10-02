@@ -17,7 +17,7 @@ import {
   Check,
   Search,
 } from 'lucide-react';
-import { Computer, DeliveryRecord, IncidentRecord, RepairRecord } from '../types';
+import { Computer, DeliveryRecord, IncidentRecord, RepairRecord, DEFAULT_COMPUTERS } from '../types';
 import { generateEquipmentHistoryPDF, formatDateOnly, formatDateTime } from '../utils/pdfGenerator';
 import { api } from '../utils/api';
 
@@ -31,12 +31,24 @@ interface ComputersViewProps {
 }
 
 export const ComputersView: React.FC<ComputersViewProps> = ({
-  computers,
+  computers: propComputers,
   deliveries,
   incidents,
   repairs,
   onRefresh,
 }) => {
+  const computers = React.useMemo(() => {
+    if (propComputers && Array.isArray(propComputers) && propComputers.length > 0) return propComputers;
+    try {
+      const saved = localStorage.getItem('lab_cached_computers');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return DEFAULT_COMPUTERS;
+  }, [propComputers]);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedComputer, setSelectedComputer] = useState<Computer | null>(null);

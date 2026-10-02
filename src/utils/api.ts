@@ -43,9 +43,15 @@ export const api = {
   },
 
   // Computers
-  async getComputers(): Promise<Computer[]> {
-    const res = await fetch('/api/computers');
+  async getComputers(status?: string): Promise<Computer[]> {
+    const url = status ? `/api/computers?status=${encodeURIComponent(status)}` : '/api/computers';
+    const res = await fetch(url);
     return parseResponseOrThrow(res, 'Error al obtener equipos');
+  },
+
+  async getAvailableComputers(): Promise<{ count: number; availablePcNumbers: string[]; computers: Computer[] }> {
+    const res = await fetch('/api/computers/available');
+    return parseResponseOrThrow(res, 'Error al obtener equipos disponibles');
   },
 
   async getComputerDetail(id: string): Promise<{

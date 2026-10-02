@@ -403,4 +403,63 @@ export interface SystemStats {
   activeDeliveriesCount: number;
   pendingAlertsCount: number;
   totalLoansToday: number;
+  availablePcNumbers?: string[];
+  inUsePcNumbers?: string[];
 }
+
+export const DEFAULT_COMPUTERS: Computer[] = Array.from({ length: 25 }, (_, i) => {
+  const num = i + 1;
+  const pad = num < 10 ? `0${num}` : `${num}`;
+  const pcNumber = `PC-${pad}`;
+  const rowLetters = ['A', 'B', 'C', 'D', 'E'];
+  const rowIndex = Math.floor(i / 5);
+  const seatIndex = (i % 5) + 1;
+  const rowLetter = rowLetters[rowIndex] || 'E';
+  const locationRow = `Fila ${rowLetter} - Puesto 0${seatIndex}`;
+
+  let model = 'Dell OptiPlex 7090 Tower';
+  let processor = 'Intel Core i7-11700 (8C/16T, 2.50 GHz)';
+  let ram = '16 GB DDR4 3200MHz';
+  let storage = '512 GB NVMe M.2 SSD';
+  const os = 'Dual Boot: Ubuntu 24.04 LTS / Windows 11 Pro';
+
+  if (rowLetter === 'B') {
+    model = 'Lenovo ThinkCentre M70s Gen 3';
+    processor = 'Intel Core i5-12500 (6C/12T, 3.00 GHz)';
+    ram = '16 GB DDR4 3200MHz';
+    storage = '512 GB PCIe M.2 SSD';
+  } else if (rowLetter === 'C') {
+    model = 'HP ProDesk 600 G6 Microtower';
+    processor = 'AMD Ryzen 7 PRO 4750G (8C/16T, 3.60 GHz)';
+    ram = '32 GB DDR4 3200MHz';
+    storage = '1 TB NVMe SSD';
+  } else if (rowLetter === 'D') {
+    model = 'Dell OptiPlex 7090 Tower';
+    processor = 'Intel Core i7-11700 (8C/16T, 2.50 GHz)';
+    ram = '16 GB DDR4 3200MHz';
+    storage = '512 GB NVMe M.2 SSD';
+  } else if (rowLetter === 'E') {
+    model = 'HP ProDesk 600 G6 Microtower';
+    processor = 'Intel Core i7-10700 (8C/16T, 2.90 GHz)';
+    ram = '16 GB DDR4 3200MHz';
+    storage = '512 GB NVMe SSD';
+  }
+
+  const isAssigned = i < 19;
+  return {
+    id: pcNumber,
+    pcNumber,
+    model,
+    processor,
+    ram,
+    storage,
+    os,
+    status: isAssigned ? 'en_uso' : 'disponible',
+    locationRow,
+    lastMaintenanceDate: '2026-03-01T08:00:00.000Z',
+    totalLoansCount: isAssigned ? 15 + (i % 7) : 4 + (i % 3),
+    totalUsageHours: isAssigned ? 45 + (i * 2) : 12 + i,
+    healthScore: isAssigned ? 95 - (i % 6) : 99,
+    notes: 'Configurado con IDEs de programación (VS Code, Python, GCC, Node.js)',
+  };
+});

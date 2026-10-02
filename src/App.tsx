@@ -18,6 +18,7 @@ import {
   SystemStats,
   UserProfile,
   DEFAULT_USER_PROFILES,
+  DEFAULT_COMPUTERS,
 } from './types';
 import { api } from './utils/api';
 import { Header } from './components/Header';
@@ -35,7 +36,16 @@ import { UserProfileModal } from './components/UserProfileModal';
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('deliveries');
   const [stats, setStats] = useState<SystemStats | null>(null);
-  const [computers, setComputers] = useState<Computer[]>([]);
+  const [computers, setComputers] = useState<Computer[]>(() => {
+    try {
+      const saved = localStorage.getItem('lab_cached_computers');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return DEFAULT_COMPUTERS;
+  });
   const [deliveries, setDeliveries] = useState<DeliveryRecord[]>([]);
   const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
   const [repairs, setRepairs] = useState<RepairRecord[]>([]);
@@ -114,12 +124,17 @@ export default function App() {
       ]);
 
       setStats(sData);
-      setComputers(cData);
-      setDeliveries(dData);
-      setIncidents(iData);
-      setRepairs(rData);
-      setAlerts(aData);
-      setNotifications(nData);
+      const resolvedComputers = (cData && Array.isArray(cData) && cData.length > 0) ? cData : DEFAULT_COMPUTERS;
+      setComputers(resolvedComputers);
+      try {
+        localStorage.setItem('lab_cached_computers', JSON.stringify(resolvedComputers));
+      } catch {}
+
+      if (dData && Array.isArray(dData)) setDeliveries(dData);
+      if (iData && Array.isArray(iData)) setIncidents(iData);
+      if (rData && Array.isArray(rData)) setRepairs(rData);
+      if (aData && Array.isArray(aData)) setAlerts(aData);
+      if (nData && Array.isArray(nData)) setNotifications(nData);
       const resolvedUsers = (uData && Array.isArray(uData) && uData.length > 0) ? uData : DEFAULT_USER_PROFILES;
       const sanitizedUsers = resolvedUsers.map((u: UserProfile) =>
         u.defaultSubject === 'Programación y Sistemas Informáticos'
