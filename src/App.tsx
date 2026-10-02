@@ -17,6 +17,7 @@ import {
   AdminNotification,
   SystemStats,
   UserProfile,
+  DEFAULT_USER_PROFILES,
 } from './types';
 import { api } from './utils/api';
 import { Header } from './components/Header';
@@ -40,7 +41,16 @@ export default function App() {
   const [repairs, setRepairs] = useState<RepairRecord[]>([]);
   const [alerts, setAlerts] = useState<MaintenanceAlert[]>([]);
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
-  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>(() => {
+    try {
+      const saved = localStorage.getItem('lab_cached_user_profiles');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return DEFAULT_USER_PROFILES;
+  });
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
     try {
       const saved = localStorage.getItem('lab_active_user_session');
@@ -110,37 +120,40 @@ export default function App() {
       setRepairs(rData);
       setAlerts(aData);
       setNotifications(nData);
-      if (uData && uData.length > 0) {
-        const sanitizedUsers = uData.map((u: UserProfile) =>
-          u.defaultSubject === 'Programación y Sistemas Informáticos'
-            ? { ...u, defaultSubject: '' }
-            : u
-        );
-        setUsers(sanitizedUsers);
-        // Maintain active user or restore session unless explicitly logged out
-        setCurrentUser((prev) => {
-          if (prev) {
-            const found = sanitizedUsers.find((u: UserProfile) => u.id === prev.id);
+      const resolvedUsers = (uData && Array.isArray(uData) && uData.length > 0) ? uData : DEFAULT_USER_PROFILES;
+      const sanitizedUsers = resolvedUsers.map((u: UserProfile) =>
+        u.defaultSubject === 'Programación y Sistemas Informáticos'
+          ? { ...u, defaultSubject: '' }
+          : u
+      );
+      setUsers(sanitizedUsers);
+      try {
+        localStorage.setItem('lab_cached_user_profiles', JSON.stringify(sanitizedUsers));
+      } catch {}
+
+      // Maintain active user or restore session unless explicitly logged out
+      setCurrentUser((prev) => {
+        if (prev) {
+          const found = sanitizedUsers.find((u: UserProfile) => u.id === prev.id);
+          if (found) return found;
+        }
+        const isExplicitlyLoggedOut = localStorage.getItem('lab_user_logged_out') === 'true';
+        if (isExplicitlyLoggedOut) {
+          return null;
+        }
+        try {
+          const saved = localStorage.getItem('lab_active_user_session');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            const found = sanitizedUsers.find((u: UserProfile) => u.id === parsed.id);
             if (found) return found;
           }
-          const isExplicitlyLoggedOut = localStorage.getItem('lab_user_logged_out') === 'true';
-          if (isExplicitlyLoggedOut) {
-            return null;
-          }
-          try {
-            const saved = localStorage.getItem('lab_active_user_session');
-            if (saved) {
-              const parsed = JSON.parse(saved);
-              const found = sanitizedUsers.find((u: UserProfile) => u.id === parsed.id);
-              if (found) return found;
-            }
-          } catch (e) {
-            console.warn(e);
-          }
-          const defaultProf = sanitizedUsers.find((u: UserProfile) => u.role === 'profesor') || sanitizedUsers[0];
-          return defaultProf || null;
-        });
-      }
+        } catch (e) {
+          console.warn(e);
+        }
+        const defaultProf = sanitizedUsers.find((u: UserProfile) => u.role === 'profesor') || sanitizedUsers[0];
+        return defaultProf || null;
+      });
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {

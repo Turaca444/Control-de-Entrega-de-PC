@@ -1000,7 +1000,11 @@ export class DatabaseStore {
 
   // --- User Profiles & Authentication ---
   public getUsers(): UserProfile[] {
-    return this.data.users || [];
+    if (!this.data.users || !Array.isArray(this.data.users) || this.data.users.length === 0) {
+      this.data.users = DEFAULT_USER_PROFILES;
+      this.save();
+    }
+    return this.data.users;
   }
 
   public getUserById(id: string): UserProfile | undefined {

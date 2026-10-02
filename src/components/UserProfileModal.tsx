@@ -18,7 +18,7 @@ import {
   EyeOff,
   LogOut,
 } from 'lucide-react';
-import { UserProfile, UserRole, SCHOOL_COURSES } from '../types';
+import { UserProfile, UserRole, SCHOOL_COURSES, DEFAULT_USER_PROFILES } from '../types';
 import { api } from '../utils/api';
 import { ConfirmModal } from './ConfirmModal';
 
@@ -466,7 +466,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               </p>
 
               <div className="space-y-2">
-                {allUsers.map((u) => (
+                {((allUsers && allUsers.length > 0) ? allUsers : DEFAULT_USER_PROFILES).map((u) => (
                   <div
                     key={u.id}
                     className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
