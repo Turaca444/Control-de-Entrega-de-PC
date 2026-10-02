@@ -75,8 +75,8 @@
       "status": "disponible",
       "locationRow": "Fila A - Puesto 05",
       "lastMaintenanceDate": "2026-09-01T08:00:00.000Z",
-      "totalLoansCount": 1,
-      "totalUsageHours": 4,
+      "totalLoansCount": 2,
+      "totalUsageHours": 4.5,
       "healthScore": 100,
       "notes": "Equipo verificado y listo para programación"
     },
@@ -402,6 +402,29 @@
     }
   ],
   "deliveries": [
+    {
+      "id": "DEL-2026-021",
+      "pcNumber": "PC-05",
+      "computerId": "PC-05",
+      "studentName": "Estudiante Verificacion",
+      "studentId": "4º Año I",
+      "studentCareer": "Programación I",
+      "teacherName": "Bringas Santiago",
+      "subjectName": "Arquitectura de Computadoras",
+      "deliveryDate": "2026-10-02T16:58:02.352Z",
+      "returnDate": "2026-10-02T16:58:02.380Z",
+      "status": "devuelto_bien",
+      "observations": "Entrega verificada",
+      "returnObservations": "Devuelto test",
+      "reportedDamageOnReturn": false,
+      "includesCharger": false,
+      "chargerReturned": false,
+      "onlyCharger": false,
+      "includesMouse": false,
+      "mouseReturned": false,
+      "onlyMouse": false,
+      "registeredBy": "Administrador de Sala"
+    },
     {
       "id": "DEL-2026-020",
       "pcNumber": "PC-01",
@@ -1011,5 +1034,5 @@
       "avatarColor": "from-red-600 to-amber-700"
     }
   ],
-  "lastUpdated": "2026-10-02T16:50:58.250Z"
+  "lastUpdated": "2026-10-02T16:58:02.380Z"
 }

@@ -86,7 +86,7 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({
   const [courseFilter, setCourseFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'activo' | 'devuelto_bien' | 'devuelto_con_novedad'>('all');
   const [teacherFilter, setTeacherFilter] = useState('');
-  const [onlyMyCourses, setOnlyMyCourses] = useState<boolean>(currentUser?.role === 'profesor');
+  const [onlyMyCourses, setOnlyMyCourses] = useState<boolean>(false);
   
   // Return modal state
   const [selectedReturnDelivery, setSelectedReturnDelivery] = useState<DeliveryRecord | null>(null);
@@ -567,8 +567,23 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({
                       <p className="font-medium text-slate-600 dark:text-slate-300">
                         {deliveries.length === 0
                           ? 'No hay registros de préstamos de PC aún.'
-                          : 'No se encontraron entregas con los filtros aplicados.'}
+                          : `No se encontraron entregas con los filtros actuales (${deliveries.length} entregas registradas en total).`}
                       </p>
+                      {deliveries.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSearchTerm('');
+                            setCourseFilter('');
+                            setStatusFilter('all');
+                            setTeacherFilter('');
+                            setOnlyMyCourses(false);
+                          }}
+                          className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white cursor-pointer shadow-xs transition-colors"
+                        >
+                          Ver todos los registros ({deliveries.length} entregas)
+                        </button>
+                      )}
                       {deliveries.length === 0 && (
                         <p className="text-xs text-slate-400 dark:text-slate-500 max-w-sm">
                           Use el botón "+ Nueva Entrega de PC" para registrar la entrega de un equipo a un estudiante con su respectivo docente y materia.

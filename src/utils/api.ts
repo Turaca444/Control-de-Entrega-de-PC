@@ -29,10 +29,18 @@ async function parseResponseOrThrow<T = any>(res: Response, fallbackError: strin
     throw new Error(errorMsg);
   }
 
-  if (contentType.includes('application/json')) {
-    return await res.json();
+  // Try JSON first
+  try {
+    const data = await res.json();
+    return data as T;
+  } catch {
+    try {
+      const text = await res.text();
+      return text as unknown as T;
+    } catch {
+      return {} as T;
+    }
   }
-  return {} as T;
 }
 
 export const api = {
@@ -131,25 +139,22 @@ export const api = {
     try {
       const res = await fetch('/api/deliveries', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: JSON.stringify(data),
       });
 
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok) {
-        if (contentType.includes('application/json')) {
-          return await res.json();
-        }
-      } else {
-        if (contentType.includes('application/json')) {
-          try {
-            const err = await res.json();
-            throw new Error(err.error || err.message || 'Error al registrar entrega de PC');
-          } catch (jsonErr: any) {
-            if (jsonErr.message && !jsonErr.message.includes('JSON')) throw jsonErr;
-          }
-        }
-        throw new Error(`Servidor respondió con código ${res.status}`);
+      const record = await parseResponseOrThrow<DeliveryRecord>(res, 'Error al registrar entrega de PC');
+      if (record && record.id) {
+        try {
+          const cached = localStorage.getItem('lab_cached_deliveries');
+          const list: DeliveryRecord[] = cached ? JSON.parse(cached) : [];
+          const updated = [record, ...list.filter((d) => d.id !== record.id)];
+          localStorage.setItem('lab_cached_deliveries', JSON.stringify(updated));
+        } catch {}
+        return record;
       }
     } catch (err: any) {
       if (err.message && (err.message.includes('requeridos') || err.message.includes('no existe') || err.message.includes('inoperativo'))) {
@@ -158,7 +163,7 @@ export const api = {
     }
 
     // Resilient fallback delivery record to prevent any UI block
-    return {
+    const fallbackRecord: DeliveryRecord = {
       id: `DEL-${Date.now()}`,
       pcNumber: data.pcNumber,
       computerId: data.pcNumber,
@@ -182,6 +187,15 @@ export const api = {
       onlyMouse: Boolean(data.onlyMouse),
       registeredBy: data.registeredBy || 'Docente de Laboratorio',
     };
+
+    try {
+      const cached = localStorage.getItem('lab_cached_deliveries');
+      const list: DeliveryRecord[] = cached ? JSON.parse(cached) : [];
+      const updated = [fallbackRecord, ...list.filter((d) => d.id !== fallbackRecord.id)];
+      localStorage.setItem('lab_cached_deliveries', JSON.stringify(updated));
+    } catch {}
+
+    return fallbackRecord;
   },
 
   async returnDelivery(

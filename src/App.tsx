@@ -46,7 +46,16 @@ export default function App() {
     } catch {}
     return DEFAULT_COMPUTERS;
   });
-  const [deliveries, setDeliveries] = useState<DeliveryRecord[]>([]);
+  const [deliveries, setDeliveries] = useState<DeliveryRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('lab_cached_deliveries');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
   const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
   const [repairs, setRepairs] = useState<RepairRecord[]>([]);
   const [alerts, setAlerts] = useState<MaintenanceAlert[]>([]);
@@ -130,7 +139,17 @@ export default function App() {
         localStorage.setItem('lab_cached_computers', JSON.stringify(resolvedComputers));
       } catch {}
 
-      if (dData && Array.isArray(dData)) setDeliveries(dData);
+      if (dData && Array.isArray(dData)) {
+        setDeliveries((prev) => {
+          const serverIds = new Set(dData.map((d: DeliveryRecord) => d.id));
+          const localOnly = prev.filter((d) => !serverIds.has(d.id));
+          const merged = [...localOnly, ...dData];
+          try {
+            localStorage.setItem('lab_cached_deliveries', JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
+      }
       if (iData && Array.isArray(iData)) setIncidents(iData);
       if (rData && Array.isArray(rData)) setRepairs(rData);
       if (aData && Array.isArray(aData)) setAlerts(aData);
@@ -295,7 +314,27 @@ export default function App() {
   const handleCreateDelivery = async (data: any) => {
     try {
       const created = await api.createDelivery(data);
-      await loadAllData();
+
+      // Immediately prepend to local state so the user sees it in the table without delay!
+      setDeliveries((prev) => [created, ...prev.filter((d) => d.id !== created.id)]);
+
+      // Immediately update computer state
+      if (created.pcNumber && !created.pcNumber.startsWith('SOLO-')) {
+        setComputers((prev) =>
+          prev.map((c) =>
+            c.pcNumber === created.pcNumber
+              ? { ...c, status: 'en_uso', totalLoansCount: (c.totalLoansCount || 0) + 1 }
+              : c
+          )
+        );
+      }
+
+      // Switch tab to deliveries view so the new record is right in front of the user!
+      setActiveTab('deliveries');
+
+      // Sync with server in background
+      loadAllData().catch(() => {});
+
       const isOnlyCharger = data.onlyCharger || data.pcNumber === 'SOLO-CARGADOR';
       const isOnlyMouse = data.onlyMouse || data.pcNumber === 'SOLO-MOUSE';
       let title = 'Asignación Creada';
