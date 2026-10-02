@@ -155,8 +155,8 @@
       "status": "disponible",
       "locationRow": "Fila B - Puesto 05",
       "lastMaintenanceDate": "2026-09-01T08:00:00.000Z",
-      "totalLoansCount": 1,
-      "totalUsageHours": 4,
+      "totalLoansCount": 2,
+      "totalUsageHours": 4.5,
       "healthScore": 100,
       "notes": "Equipo verificado y listo para programación"
     },
@@ -402,6 +402,32 @@
     }
   ],
   "deliveries": [
+    {
+      "id": "DEL-2026-022",
+      "pcNumber": "PC-10",
+      "computerId": "PC-10",
+      "studentName": "Prueba Cargador",
+      "studentId": "4º Año I",
+      "studentCareer": "Ingeniería",
+      "teacherName": "Bringas Santiago",
+      "subjectName": "Arquitectura",
+      "deliveryDate": "2026-10-02T17:37:00.417Z",
+      "returnDate": "2026-10-02T17:37:00.465Z",
+      "status": "devuelto_bien",
+      "observations": "Equipo entregado en condiciones estándar. [⚡ Cargador asignado en uso (05:37 p. m.): Cargador Test 1 - Batería baja] [⚡ Cargador asignado en uso (05:37 p. m.): Cargador Test 2 - Batería baja 2] [⚡ Cargador asignado en uso (05:37 p. m.): Cargador Test 3 - Batería agotada en clase]",
+      "returnObservations": "Devolución test",
+      "reportedDamageOnReturn": false,
+      "includesCharger": true,
+      "chargerNumber": "Cargador Test 3",
+      "chargerReturned": true,
+      "onlyCharger": false,
+      "includesMouse": false,
+      "mouseReturned": false,
+      "onlyMouse": false,
+      "registeredBy": "Administrador de Sala",
+      "chargerAssignedLater": true,
+      "chargerAssignedAt": "2026-10-02T17:37:00.456Z"
+    },
     {
       "id": "DEL-2026-021",
       "pcNumber": "PC-05",
@@ -909,7 +935,38 @@
   "incidents": [],
   "repairs": [],
   "maintenanceAlerts": [],
-  "notifications": [],
+  "notifications": [
+    {
+      "title": "⚡ Cargador asignado a PC-10",
+      "message": "Se asignó Cargador Test 3 a Prueba Cargador (4º Año I) por quedarse sin batería en clase.",
+      "type": "maintenance",
+      "priority": "normal",
+      "pcNumber": "PC-10",
+      "id": "NOTIF-1790962620457",
+      "timestamp": "2026-10-02T17:37:00.457Z",
+      "read": false
+    },
+    {
+      "title": "⚡ Cargador asignado a PC-10",
+      "message": "Se asignó Cargador Test 2 a Prueba Cargador (4º Año I) por quedarse sin batería en clase.",
+      "type": "maintenance",
+      "priority": "normal",
+      "pcNumber": "PC-10",
+      "id": "NOTIF-1790962620449",
+      "timestamp": "2026-10-02T17:37:00.449Z",
+      "read": false
+    },
+    {
+      "title": "⚡ Cargador asignado a PC-10",
+      "message": "Se asignó Cargador Test 1 a Prueba Cargador (4º Año I) por quedarse sin batería en clase.",
+      "type": "maintenance",
+      "priority": "normal",
+      "pcNumber": "PC-10",
+      "id": "NOTIF-1790962620442",
+      "timestamp": "2026-10-02T17:37:00.442Z",
+      "read": false
+    }
+  ],
   "users": [
     {
       "id": "admin-lab",
@@ -1034,5 +1091,5 @@
       "avatarColor": "from-red-600 to-amber-700"
     }
   ],
-  "lastUpdated": "2026-10-02T16:58:02.380Z"
+  "lastUpdated": "2026-10-02T17:37:00.465Z"
 }

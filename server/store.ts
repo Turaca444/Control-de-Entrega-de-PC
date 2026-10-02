@@ -475,7 +475,7 @@ export class DatabaseStore {
       mouseReturned?: boolean;
     }
   ): DeliveryRecord | null {
-    const delivery = this.data.deliveries.find((d) => d.id === id);
+    const delivery = this.data.deliveries.find((d) => d.id === id || (d.pcNumber === id && d.status === 'activo'));
     if (!delivery) return null;
 
     delivery.returnDate = new Date().toISOString();
@@ -542,7 +542,7 @@ export class DatabaseStore {
       registeredBy?: string;
     }
   ): DeliveryRecord | null {
-    const delivery = this.data.deliveries.find((d) => d.id === id);
+    const delivery = this.data.deliveries.find((d) => d.id === id || (d.pcNumber === id && d.status === 'activo'));
     if (!delivery) return null;
 
     const chargerNumber = payload.chargerNumber?.trim() || `Cargador ${delivery.pcNumber.replace(/\D/g, '') || '01'}`;
@@ -578,7 +578,7 @@ export class DatabaseStore {
   }
 
   public removeChargerFromDelivery(id: string): DeliveryRecord | null {
-    const delivery = this.data.deliveries.find((d) => d.id === id);
+    const delivery = this.data.deliveries.find((d) => d.id === id || (d.pcNumber === id && d.status === 'activo'));
     if (!delivery) return null;
 
     delivery.includesCharger = false;
@@ -601,7 +601,7 @@ export class DatabaseStore {
       registeredBy?: string;
     }
   ): DeliveryRecord | null {
-    const delivery = this.data.deliveries.find((d) => d.id === id);
+    const delivery = this.data.deliveries.find((d) => d.id === id || (d.pcNumber === id && d.status === 'activo'));
     if (!delivery) return null;
 
     const mouseNumber = payload.mouseNumber?.trim() || `Mouse ${delivery.pcNumber.replace(/\D/g, '') || '01'}`;

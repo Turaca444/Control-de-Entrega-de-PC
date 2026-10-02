@@ -277,20 +277,32 @@ async function startServer() {
   app.post('/api/deliveries', handleCreateDelivery);
   app.post('/api/deliveries/create', handleCreateDelivery);
 
-  app.put('/api/deliveries/:id/return', (req: Request, res: Response) => {
-    const returned = dbStore.returnDelivery(req.params.id, req.body);
+  const handleReturnDeliveryRoute = (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const id = req.params.id || req.body.id || req.body.deliveryId;
+    if (!id) return res.status(400).json({ error: 'ID de préstamo requerido' });
+    const returned = dbStore.returnDelivery(id, req.body);
     if (!returned) {
       return res.status(404).json({ error: 'Préstamo no encontrado' });
     }
-    res.json(returned);
-  });
+    return res.json(returned);
+  };
 
-  app.put('/api/deliveries/:id/assign-charger', (req: Request, res: Response) => {
+  app.put('/api/deliveries/:id/return', handleReturnDeliveryRoute);
+  app.post('/api/deliveries/:id/return', handleReturnDeliveryRoute);
+  app.post('/api/deliveries/return', handleReturnDeliveryRoute);
+
+  const handleAssignCharger = (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const id = req.params.id || req.body.id || req.body.deliveryId;
     const { chargerNumber, reason, registeredBy } = req.body;
     if (!chargerNumber || !chargerNumber.trim()) {
       return res.status(400).json({ error: 'Debe especificar el número o código del cargador' });
     }
-    const updated = dbStore.assignChargerToDelivery(req.params.id, {
+    if (!id) {
+      return res.status(400).json({ error: 'ID de préstamo requerido' });
+    }
+    const updated = dbStore.assignChargerToDelivery(id, {
       chargerNumber,
       reason,
       registeredBy,
@@ -298,23 +310,39 @@ async function startServer() {
     if (!updated) {
       return res.status(404).json({ error: 'Préstamo no encontrado' });
     }
-    res.json(updated);
-  });
+    return res.json(updated);
+  };
 
-  app.delete('/api/deliveries/:id/charger', (req: Request, res: Response) => {
-    const updated = dbStore.removeChargerFromDelivery(req.params.id);
+  app.put('/api/deliveries/:id/assign-charger', handleAssignCharger);
+  app.post('/api/deliveries/:id/assign-charger', handleAssignCharger);
+  app.post('/api/deliveries/assign-charger', handleAssignCharger);
+
+  const handleRemoveCharger = (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const id = req.params.id || req.body.id || req.body.deliveryId;
+    if (!id) return res.status(400).json({ error: 'ID de préstamo requerido' });
+    const updated = dbStore.removeChargerFromDelivery(id);
     if (!updated) {
       return res.status(404).json({ error: 'Préstamo no encontrado' });
     }
-    res.json(updated);
-  });
+    return res.json(updated);
+  };
 
-  app.put('/api/deliveries/:id/assign-mouse', (req: Request, res: Response) => {
+  app.delete('/api/deliveries/:id/charger', handleRemoveCharger);
+  app.post('/api/deliveries/:id/charger', handleRemoveCharger);
+  app.post('/api/deliveries/remove-charger', handleRemoveCharger);
+
+  const handleAssignMouse = (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const id = req.params.id || req.body.id || req.body.deliveryId;
     const { mouseNumber, mouseBrand, reason, registeredBy } = req.body;
     if (!mouseNumber || !mouseNumber.trim()) {
       return res.status(400).json({ error: 'Debe especificar el número o código del mouse' });
     }
-    const updated = dbStore.assignMouseToDelivery(req.params.id, {
+    if (!id) {
+      return res.status(400).json({ error: 'ID de préstamo requerido' });
+    }
+    const updated = dbStore.assignMouseToDelivery(id, {
       mouseNumber,
       mouseBrand,
       reason,
@@ -323,24 +351,42 @@ async function startServer() {
     if (!updated) {
       return res.status(404).json({ error: 'Préstamo no encontrado' });
     }
-    res.json(updated);
-  });
+    return res.json(updated);
+  };
 
-  app.delete('/api/deliveries/:id/mouse', (req: Request, res: Response) => {
-    const updated = dbStore.removeMouseFromDelivery(req.params.id);
+  app.put('/api/deliveries/:id/assign-mouse', handleAssignMouse);
+  app.post('/api/deliveries/:id/assign-mouse', handleAssignMouse);
+  app.post('/api/deliveries/assign-mouse', handleAssignMouse);
+
+  const handleRemoveMouse = (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const id = req.params.id || req.body.id || req.body.deliveryId;
+    if (!id) return res.status(400).json({ error: 'ID de préstamo requerido' });
+    const updated = dbStore.removeMouseFromDelivery(id);
     if (!updated) {
       return res.status(404).json({ error: 'Préstamo no encontrado' });
     }
-    res.json(updated);
-  });
+    return res.json(updated);
+  };
 
-  app.delete('/api/deliveries/:id', (req: Request, res: Response) => {
-    const success = dbStore.deleteDelivery(req.params.id);
+  app.delete('/api/deliveries/:id/mouse', handleRemoveMouse);
+  app.post('/api/deliveries/:id/mouse', handleRemoveMouse);
+  app.post('/api/deliveries/remove-mouse', handleRemoveMouse);
+
+  const handleDeleteDeliveryRoute = (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const id = req.params.id || req.body.id || req.body.deliveryId;
+    if (!id) return res.status(400).json({ error: 'ID de préstamo requerido' });
+    const success = dbStore.deleteDelivery(id);
     if (!success) {
       return res.status(404).json({ error: 'Préstamo no encontrado' });
     }
-    res.json({ success: true, message: 'Registro de préstamo eliminado de la planilla' });
-  });
+    return res.json({ success: true, message: 'Registro de préstamo eliminado de la planilla' });
+  };
+
+  app.delete('/api/deliveries/:id', handleDeleteDeliveryRoute);
+  app.post('/api/deliveries/:id/delete', handleDeleteDeliveryRoute);
+  app.post('/api/deliveries/delete', handleDeleteDeliveryRoute);
 
   app.post('/api/deliveries/return-course', (req: Request, res: Response) => {
     const { course, teacherName } = req.body;

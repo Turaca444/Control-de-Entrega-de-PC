@@ -506,7 +506,7 @@ var DatabaseStore = class {
     return newRecord;
   }
   returnDelivery(id, payload) {
-    const delivery = this.data.deliveries.find((d) => d.id === id);
+    const delivery = this.data.deliveries.find((d) => d.id === id || d.pcNumber === id && d.status === "activo");
     if (!delivery) return null;
     delivery.returnDate = (/* @__PURE__ */ new Date()).toISOString();
     delivery.returnObservations = payload.returnObservations || "Devuelto por el usuario.";
@@ -557,7 +557,7 @@ var DatabaseStore = class {
     return delivery;
   }
   assignChargerToDelivery(id, payload) {
-    const delivery = this.data.deliveries.find((d) => d.id === id);
+    const delivery = this.data.deliveries.find((d) => d.id === id || d.pcNumber === id && d.status === "activo");
     if (!delivery) return null;
     const chargerNumber = payload.chargerNumber?.trim() || `Cargador ${delivery.pcNumber.replace(/\D/g, "") || "01"}`;
     delivery.includesCharger = true;
@@ -587,7 +587,7 @@ var DatabaseStore = class {
     return delivery;
   }
   removeChargerFromDelivery(id) {
-    const delivery = this.data.deliveries.find((d) => d.id === id);
+    const delivery = this.data.deliveries.find((d) => d.id === id || d.pcNumber === id && d.status === "activo");
     if (!delivery) return null;
     delivery.includesCharger = false;
     delivery.chargerNumber = void 0;
@@ -599,7 +599,7 @@ var DatabaseStore = class {
     return delivery;
   }
   assignMouseToDelivery(id, payload) {
-    const delivery = this.data.deliveries.find((d) => d.id === id);
+    const delivery = this.data.deliveries.find((d) => d.id === id || d.pcNumber === id && d.status === "activo");
     if (!delivery) return null;
     const mouseNumber = payload.mouseNumber?.trim() || `Mouse ${delivery.pcNumber.replace(/\D/g, "") || "01"}`;
     const mouseBrand = payload.mouseBrand?.trim() || delivery.mouseBrand || "Logitech M90";

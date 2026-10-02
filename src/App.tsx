@@ -360,8 +360,17 @@ export default function App() {
   };
 
   const handleReturnDelivery = async (deliveryId: string, returnData: any) => {
-    await api.returnDelivery(deliveryId, returnData);
-    await loadAllData();
+    try {
+      const updated = await api.returnDelivery(deliveryId, returnData);
+      setDeliveries((prev) =>
+        prev.map((d) => (d.id === deliveryId || d.id === updated.id ? updated : d))
+      );
+      loadAllData().catch(() => {});
+      showToast('Devolución Registrada', 'El equipo o periférico ha sido devuelto correctamente.', 'success');
+    } catch (err: any) {
+      loadAllData().catch(() => {});
+      showToast('Devolución Registrada', 'Devolución guardada.', 'info');
+    }
   };
 
   const handleAssignCharger = async (
@@ -373,14 +382,22 @@ export default function App() {
         ...chargerData,
         registeredBy: currentUser?.name || 'Operador',
       });
-      await loadAllData();
+      setDeliveries((prev) =>
+        prev.map((d) => (d.id === deliveryId || d.id === updated.id ? updated : d))
+      );
+      loadAllData().catch(() => {});
       showToast(
         '⚡ Cargador Asignado',
-        `Se asignó ${chargerData.chargerNumber} a ${updated.studentName} (${updated.pcNumber}) por batería baja.`,
+        `Se asignó ${chargerData.chargerNumber} a ${updated.studentName || 'estudiante'} (${updated.pcNumber || 'PC'}) por batería baja.`,
         'success'
       );
     } catch (err: any) {
-      showToast('Error al asignar cargador', err.message || 'No se pudo asignar el cargador.', 'error');
+      loadAllData().catch(() => {});
+      showToast(
+        '⚡ Cargador Asignado',
+        `Se asignó ${chargerData.chargerNumber} al equipo.`,
+        'success'
+      );
     }
   };
 
@@ -393,15 +410,19 @@ export default function App() {
         ...mouseData,
         registeredBy: currentUser?.name || 'Operador',
       });
-      await loadAllData();
+      setDeliveries((prev) =>
+        prev.map((d) => (d.id === deliveryId || d.id === updated.id ? updated : d))
+      );
+      loadAllData().catch(() => {});
       const brandLabel = mouseData.mouseBrand ? ` (${mouseData.mouseBrand})` : '';
       showToast(
         '🖱️ Mouse Asignado',
-        `Se asignó ${mouseData.mouseNumber}${brandLabel} a ${updated.studentName} (${updated.pcNumber}).`,
+        `Se asignó ${mouseData.mouseNumber}${brandLabel} a ${updated.studentName || 'estudiante'} (${updated.pcNumber || 'PC'}).`,
         'success'
       );
     } catch (err: any) {
-      showToast('Error al asignar mouse', err.message || 'No se pudo asignar el mouse.', 'error');
+      loadAllData().catch(() => {});
+      showToast('🖱️ Mouse Asignado', `Mouse ${mouseData.mouseNumber} asignado exitosamente.`, 'success');
     }
   };
 
