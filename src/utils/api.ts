@@ -54,6 +54,11 @@ export const api = {
     return parseResponseOrThrow(res, 'Error al obtener equipos disponibles');
   },
 
+  async liberateAllComputers(): Promise<{ success: boolean; message: string; availableCount: number; computers: Computer[] }> {
+    const res = await fetch('/api/computers/liberate-all', { method: 'POST' });
+    return parseResponseOrThrow(res, 'Error al liberar todas las computadoras');
+  },
+
   async getComputerDetail(id: string): Promise<{
     computer: Computer;
     history: {

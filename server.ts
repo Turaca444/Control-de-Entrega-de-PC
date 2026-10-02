@@ -95,6 +95,30 @@ async function startServer() {
     }
   });
 
+  // Liberate / make all computers available
+  app.post('/api/computers/liberate-all', (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const computers = dbStore.getComputers();
+    // Return all active deliveries
+    const activeDeliveries = dbStore.getDeliveries({ status: 'activo' });
+    activeDeliveries.forEach((d) => {
+      dbStore.returnDelivery(d.id, {
+        returnObservations: 'Devolución de equipo registrada. Todas las computadoras liberadas.',
+        chargerReturned: true,
+        mouseReturned: true,
+      });
+    });
+    computers.forEach((c) => {
+      dbStore.updateComputer(c.id, { status: 'disponible' });
+    });
+    return res.json({
+      success: true,
+      message: 'Todas las computadoras (PC-01 a PC-25) han sido liberadas y se encuentran disponibles.',
+      availableCount: 25,
+      computers: dbStore.getComputers(),
+    });
+  });
+
   app.get('/api/computers/:id', (req: Request, res: Response) => {
     const comp = dbStore.getComputerById(req.params.id);
     if (!comp) {

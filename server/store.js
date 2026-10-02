@@ -130,7 +130,6 @@ var DEFAULT_COMPUTERS = Array.from({ length: 25 }, (_, i) => {
     ram = "16 GB DDR4 3200MHz";
     storage = "512 GB NVMe SSD";
   }
-  const isAssigned = i < 19;
   return {
     id: pcNumber,
     pcNumber,
@@ -139,12 +138,12 @@ var DEFAULT_COMPUTERS = Array.from({ length: 25 }, (_, i) => {
     ram,
     storage,
     os,
-    status: isAssigned ? "en_uso" : "disponible",
+    status: "disponible",
     locationRow,
     lastMaintenanceDate: "2026-03-01T08:00:00.000Z",
-    totalLoansCount: isAssigned ? 15 + i % 7 : 4 + i % 3,
-    totalUsageHours: isAssigned ? 45 + i * 2 : 12 + i,
-    healthScore: isAssigned ? 95 - i % 6 : 99,
+    totalLoansCount: 0,
+    totalUsageHours: 12 + i,
+    healthScore: 100,
     notes: "Configurado con IDEs de programaci\xF3n (VS Code, Python, GCC, Node.js)"
   };
 });
@@ -187,7 +186,6 @@ var INITIAL_COMPUTERS = Array.from({ length: 25 }, (_, i) => {
     ram = "16 GB DDR4 3200MHz";
     storage = "512 GB NVMe SSD";
   }
-  const isAssigned = i < 19;
   return {
     id: pcNumber,
     pcNumber,
@@ -196,11 +194,11 @@ var INITIAL_COMPUTERS = Array.from({ length: 25 }, (_, i) => {
     ram,
     storage,
     os,
-    status: isAssigned ? "en_uso" : "disponible",
+    status: "disponible",
     locationRow,
     lastMaintenanceDate: "2026-09-01T08:00:00.000Z",
-    totalLoansCount: isAssigned ? 1 : 0,
-    totalUsageHours: isAssigned ? 4 : 0,
+    totalLoansCount: 0,
+    totalUsageHours: 0,
     healthScore: 100,
     notes: "Equipo verificado y listo para programaci\xF3n"
   };
@@ -254,18 +252,18 @@ var INITIAL_DELIVERIES = STUDENTS_4_I.map((studentName, idx) => {
     subjectName: "Arquitectura de Computadoras y Hardware",
     deliveryDate: (/* @__PURE__ */ new Date("2026-09-28T08:00:00.000Z")).toISOString(),
     expectedReturnTime: (/* @__PURE__ */ new Date("2026-09-28T12:00:00.000Z")).toISOString(),
-    returnDate: null,
-    status: "activo",
+    returnDate: (/* @__PURE__ */ new Date("2026-09-28T12:00:00.000Z")).toISOString(),
+    status: "devuelto_bien",
     observations: "Equipo entregado en condiciones \xF3ptimas. Sin da\xF1os previos detectados.",
-    returnObservations: "",
+    returnObservations: "Devoluci\xF3n completa en \xF3ptimas condiciones al finalizar la clase.",
     reportedDamageOnReturn: false,
     includesCharger: true,
     chargerNumber: `Cargador ${String(pcNum).padStart(2, "0")}`,
-    chargerReturned: false,
+    chargerReturned: true,
     includesMouse,
     mouseNumber: mouseCode || void 0,
     mouseBrand: includesMouse ? "Logitech M90" : void 0,
-    mouseReturned: false,
+    mouseReturned: true,
     registeredBy: "Encargado de Laboratorio"
   };
 });

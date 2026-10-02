@@ -445,7 +445,6 @@ export const DEFAULT_COMPUTERS: Computer[] = Array.from({ length: 25 }, (_, i) =
     storage = '512 GB NVMe SSD';
   }
 
-  const isAssigned = i < 19;
   return {
     id: pcNumber,
     pcNumber,
@@ -454,12 +453,12 @@ export const DEFAULT_COMPUTERS: Computer[] = Array.from({ length: 25 }, (_, i) =
     ram,
     storage,
     os,
-    status: isAssigned ? 'en_uso' : 'disponible',
+    status: 'disponible',
     locationRow,
     lastMaintenanceDate: '2026-03-01T08:00:00.000Z',
-    totalLoansCount: isAssigned ? 15 + (i % 7) : 4 + (i % 3),
-    totalUsageHours: isAssigned ? 45 + (i * 2) : 12 + i,
-    healthScore: isAssigned ? 95 - (i % 6) : 99,
+    totalLoansCount: 0,
+    totalUsageHours: 12 + i,
+    healthScore: 100,
     notes: 'Configurado con IDEs de programación (VS Code, Python, GCC, Node.js)',
   };
 });

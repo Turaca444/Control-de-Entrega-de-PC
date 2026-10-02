@@ -16,6 +16,7 @@ import {
   X,
   Check,
   Search,
+  RotateCcw,
 } from 'lucide-react';
 import { Computer, DeliveryRecord, IncidentRecord, RepairRecord, DEFAULT_COMPUTERS } from '../types';
 import { generateEquipmentHistoryPDF, formatDateOnly, formatDateTime } from '../utils/pdfGenerator';
@@ -109,6 +110,23 @@ export const ComputersView: React.FC<ComputersViewProps> = ({
     }
   };
 
+  const [isLiberating, setIsLiberating] = useState(false);
+
+  const handleLiberateAll = async () => {
+    if (!window.confirm('¿Deseas marcar todas las computadoras (PC-01 a PC-25) como disponibles y dar por concluidos los préstamos activos?')) {
+      return;
+    }
+    try {
+      setIsLiberating(true);
+      await api.liberateAllComputers();
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message || 'Error al liberar computadoras');
+    } finally {
+      setIsLiberating(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'disponible':
@@ -162,13 +180,26 @@ export const ComputersView: React.FC<ComputersViewProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-sm transition-colors cursor-pointer shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Registrar Nuevo Equipo</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={handleLiberateAll}
+            disabled={isLiberating}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+            title="Marcar todas las computadoras (PC-01 a PC-25) como disponibles"
+          >
+            <RotateCcw className={`w-3.5 h-3.5 ${isLiberating ? 'animate-spin' : ''}`} />
+            <span>{isLiberating ? 'Liberando...' : 'Liberar Todas (PC-01 a PC-25)'}</span>
+          </button>
+
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-sm transition-colors cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Registrar Nuevo Equipo</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search */}

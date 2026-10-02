@@ -66,7 +66,6 @@ const INITIAL_COMPUTERS: Computer[] = Array.from({ length: 25 }, (_, i) => {
     storage = '512 GB NVMe SSD';
   }
 
-  const isAssigned = i < 19;
   return {
     id: pcNumber,
     pcNumber,
@@ -75,11 +74,11 @@ const INITIAL_COMPUTERS: Computer[] = Array.from({ length: 25 }, (_, i) => {
     ram,
     storage,
     os,
-    status: isAssigned ? 'en_uso' : 'disponible',
+    status: 'disponible',
     locationRow,
     lastMaintenanceDate: '2026-09-01T08:00:00.000Z',
-    totalLoansCount: isAssigned ? 1 : 0,
-    totalUsageHours: isAssigned ? 4 : 0,
+    totalLoansCount: 0,
+    totalUsageHours: 0,
     healthScore: 100,
     notes: 'Equipo verificado y listo para programación',
   };
@@ -137,18 +136,18 @@ const INITIAL_DELIVERIES: DeliveryRecord[] = STUDENTS_4_I.map((studentName, idx)
     subjectName: 'Arquitectura de Computadoras y Hardware',
     deliveryDate: new Date('2026-09-28T08:00:00.000Z').toISOString(),
     expectedReturnTime: new Date('2026-09-28T12:00:00.000Z').toISOString(),
-    returnDate: null,
-    status: 'activo',
+    returnDate: new Date('2026-09-28T12:00:00.000Z').toISOString(),
+    status: 'devuelto_bien',
     observations: 'Equipo entregado en condiciones óptimas. Sin daños previos detectados.',
-    returnObservations: '',
+    returnObservations: 'Devolución completa en óptimas condiciones al finalizar la clase.',
     reportedDamageOnReturn: false,
     includesCharger: true,
     chargerNumber: `Cargador ${String(pcNum).padStart(2, '0')}`,
-    chargerReturned: false,
+    chargerReturned: true,
     includesMouse,
     mouseNumber: mouseCode || undefined,
     mouseBrand: includesMouse ? 'Logitech M90' : undefined,
-    mouseReturned: false,
+    mouseReturned: true,
     registeredBy: 'Encargado de Laboratorio',
   };
 });
