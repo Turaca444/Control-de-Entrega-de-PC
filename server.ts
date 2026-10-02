@@ -443,12 +443,26 @@ async function startServer() {
   });
 
   // Change PIN before or after logging in
-  app.post('/api/users/:id/change-pin', (req: Request, res: Response) => {
+  const handleChangePin = (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const id = req.params.id || req.body.id || (req.query.id as string);
     const { currentPin, newPin, directReset } = req.body;
-    const user = dbStore.getUserById(req.params.id);
+
+    if (!id) {
+      return res.status(400).json({ error: 'Debe especificar el usuario docente' });
+    }
+
+    let user = dbStore.getUserById(id);
+    if (!user) {
+      user = dbStore.getUsers().find(
+        (u) => u.id.toLowerCase() === id.toLowerCase() || u.name.toLowerCase() === id.toLowerCase()
+      );
+    }
+
     if (!user) {
       return res.status(404).json({ error: 'Perfil de docente no encontrado' });
     }
+
     if (!newPin || !newPin.trim()) {
       return res.status(400).json({ error: 'Debe ingresar un nuevo PIN (mínimo 4 caracteres)' });
     }
@@ -458,7 +472,7 @@ async function startServer() {
 
     // If currentPin is required and not direct reset, verify it matches
     const existingPin = user.pin || '1234';
-    if (!directReset && currentPin !== undefined && currentPin !== null) {
+    if (!directReset && currentPin !== undefined && currentPin !== null && currentPin.trim() !== '') {
       if (currentPin.trim() !== existingPin) {
         return res.status(400).json({
           error: 'El PIN actual no coincide. Si nunca lo habías cambiado, el PIN inicial es 1234.',
@@ -466,8 +480,8 @@ async function startServer() {
       }
     }
 
-    const updated = dbStore.updateUser(req.params.id, { pin: newPin.trim() });
-    res.json({
+    const updated = dbStore.updateUser(user.id, { pin: newPin.trim() });
+    return res.json({
       success: true,
       message: `PIN actualizado correctamente para ${user.name}`,
       user: {
@@ -482,7 +496,10 @@ async function startServer() {
         pin: updated!.pin,
       },
     });
-  });
+  };
+
+  app.post('/api/users/:id/change-pin', handleChangePin);
+  app.post('/api/users/change-pin', handleChangePin);
 
   app.get('/api/users/:id', (req: Request, res: Response) => {
     const user = dbStore.getUserById(req.params.id);

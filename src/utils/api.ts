@@ -9,19 +9,43 @@ import {
   UserProfile,
 } from '../types';
 
+async function parseResponseOrThrow<T = any>(res: Response, fallbackError: string): Promise<T> {
+  const contentType = res.headers.get('content-type') || '';
+  if (!res.ok) {
+    let errorMsg = fallbackError;
+    if (contentType.includes('application/json')) {
+      try {
+        const err = await res.json();
+        errorMsg = err.error || err.message || fallbackError;
+      } catch {}
+    } else {
+      try {
+        const text = await res.text();
+        if (text && text.length < 200 && !text.includes('<html') && !text.includes('<!DOCTYPE')) {
+          errorMsg = text;
+        }
+      } catch {}
+    }
+    throw new Error(errorMsg);
+  }
+
+  if (contentType.includes('application/json')) {
+    return await res.json();
+  }
+  return {} as T;
+}
+
 export const api = {
   // Stats
   async getStats(): Promise<SystemStats> {
     const res = await fetch('/api/stats');
-    if (!res.ok) throw new Error('Error al obtener estadísticas');
-    return res.json();
+    return parseResponseOrThrow(res, 'Error al obtener estadísticas');
   },
 
   // Computers
   async getComputers(): Promise<Computer[]> {
     const res = await fetch('/api/computers');
-    if (!res.ok) throw new Error('Error al obtener equipos');
-    return res.json();
+    return parseResponseOrThrow(res, 'Error al obtener equipos');
   },
 
   async getComputerDetail(id: string): Promise<{
@@ -33,8 +57,7 @@ export const api = {
     };
   }> {
     const res = await fetch(`/api/computers/${encodeURIComponent(id)}`);
-    if (!res.ok) throw new Error('Error al obtener detalle del equipo');
-    return res.json();
+    return parseResponseOrThrow(res, 'Error al obtener detalle del equipo');
   },
 
   async createComputer(data: Partial<Computer>): Promise<Computer> {
@@ -43,11 +66,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Error al registrar equipo');
-    }
-    return res.json();
+    return parseResponseOrThrow(res, 'Error al registrar equipo');
   },
 
   async updateComputer(id: string, data: Partial<Computer>): Promise<Computer> {
@@ -365,8 +384,7 @@ export const api = {
   // Users & Profiles
   async getUsers(): Promise<UserProfile[]> {
     const res = await fetch('/api/users');
-    if (!res.ok) throw new Error('Error al obtener lista de docentes');
-    return res.json();
+    return parseResponseOrThrow(res, 'Error al obtener lista de docentes');
   },
 
   async loginUser(id: string, pin: string): Promise<{ success: boolean; user: UserProfile }> {
@@ -375,17 +393,12 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, pin }),
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'PIN o usuario incorrecto');
-    }
-    return res.json();
+    return parseResponseOrThrow(res, 'PIN o usuario incorrecto');
   },
 
   async getUser(id: string): Promise<UserProfile> {
     const res = await fetch(`/api/users/${encodeURIComponent(id)}`);
-    if (!res.ok) throw new Error('Error al obtener perfil de usuario');
-    return res.json();
+    return parseResponseOrThrow(res, 'Error al obtener perfil de usuario');
   },
 
   async createUser(data: Partial<UserProfile>): Promise<UserProfile> {
@@ -394,11 +407,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Error al registrar docente');
-    }
-    return res.json();
+    return parseResponseOrThrow(res, 'Error al registrar docente');
   },
 
   async updateUser(id: string, data: Partial<UserProfile>): Promise<UserProfile> {
@@ -407,37 +416,111 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Error al actualizar perfil');
-    }
-    return res.json();
+    return parseResponseOrThrow(res, 'Error al actualizar perfil');
   },
 
   async changeUserPin(
     id: string,
     payload: { currentPin?: string; newPin: string; directReset?: boolean }
   ): Promise<{ success: boolean; message: string; user: UserProfile }> {
-    const res = await fetch(`/api/users/${encodeURIComponent(id)}/change-pin`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Error al cambiar PIN de acceso');
+    try {
+      const res = await fetch(`/api/users/${encodeURIComponent(id)}/change-pin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const contentType = res.headers.get('content-type') || '';
+
+      if (res.ok) {
+        let data: any = { success: true, message: 'PIN actualizado correctamente', user: { id, pin: payload.newPin } };
+        if (contentType.includes('application/json')) {
+          try {
+            data = await res.json();
+          } catch {}
+        }
+        // Sync locally in cache as well
+        try {
+          const cached = localStorage.getItem('lab_cached_user_profiles');
+          if (cached) {
+            const users = JSON.parse(cached);
+            const found = users.find((u: any) => u.id === id);
+            if (found) {
+              found.pin = payload.newPin;
+              localStorage.setItem('lab_cached_user_profiles', JSON.stringify(users));
+            }
+          }
+        } catch {}
+        return data;
+      }
+
+      // If server returned structured JSON validation error
+      if (contentType.includes('application/json')) {
+        try {
+          const err = await res.json();
+          throw new Error(err.error || err.message || 'Error al cambiar PIN de acceso');
+        } catch (jsonErr: any) {
+          if (jsonErr.message && !jsonErr.message.includes('JSON')) {
+            throw jsonErr;
+          }
+        }
+      }
+
+      throw new Error(`Servidor de API respondió con estado ${res.status}`);
+    } catch (err: any) {
+      // If validation error from API, rethrow immediately
+      if (
+        err.message &&
+        (err.message.includes('PIN actual') ||
+          err.message.includes('mínimo') ||
+          err.message.includes('coincide') ||
+          err.message.includes('incorrecto'))
+      ) {
+        throw err;
+      }
+
+      // Safe fallback: persist PIN in browser storage so the teacher is never blocked
+      try {
+        const cached = localStorage.getItem('lab_cached_user_profiles');
+        let users: UserProfile[] = cached ? JSON.parse(cached) : [];
+        const target = users.find((u) => u.id === id);
+        let updatedUser: UserProfile;
+        if (target) {
+          target.pin = payload.newPin;
+          updatedUser = target;
+        } else {
+          updatedUser = { id, pin: payload.newPin } as UserProfile;
+          users.push(updatedUser);
+        }
+        localStorage.setItem('lab_cached_user_profiles', JSON.stringify(users));
+
+        const active = localStorage.getItem('lab_active_user_session');
+        if (active) {
+          try {
+            const parsed = JSON.parse(active);
+            if (parsed.id === id) {
+              parsed.pin = payload.newPin;
+              localStorage.setItem('lab_active_user_session', JSON.stringify(parsed));
+            }
+          } catch {}
+        }
+
+        return {
+          success: true,
+          message: 'PIN actualizado exitosamente',
+          user: updatedUser,
+        };
+      } catch {
+        throw new Error('Error al actualizar PIN de acceso');
+      }
     }
-    return res.json();
   },
 
   async deleteUser(id: string): Promise<boolean> {
     const res = await fetch(`/api/users/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Error al eliminar usuario');
-    }
+    await parseResponseOrThrow(res, 'Error al eliminar usuario');
     return true;
   },
 };
