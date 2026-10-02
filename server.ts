@@ -186,7 +186,8 @@ async function startServer() {
     res.json(deliveries);
   });
 
-  app.post('/api/deliveries', (req: Request, res: Response) => {
+  const handleCreateDelivery = (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     const {
       pcNumber,
       studentName,
@@ -206,30 +207,43 @@ async function startServer() {
       onlyMouse,
     } = req.body;
 
+    let targetPcNumber = (pcNumber || '').trim();
+    if (/^\d+$/.test(targetPcNumber)) {
+      targetPcNumber = `PC-${targetPcNumber.padStart(2, '0')}`;
+    } else if (/^PC-\d$/.test(targetPcNumber)) {
+      targetPcNumber = `PC-0${targetPcNumber.slice(3)}`;
+    }
+
     const isOnlyCharger = Boolean(
-      onlyCharger || pcNumber === 'SOLO-CARGADOR' || pcNumber?.startsWith('SOLO-CARGADOR')
+      onlyCharger || targetPcNumber === 'SOLO-CARGADOR' || targetPcNumber.startsWith('SOLO-CARGADOR')
     );
     const isOnlyMouse = Boolean(
-      onlyMouse || pcNumber === 'SOLO-MOUSE' || pcNumber?.startsWith('SOLO-MOUSE')
+      onlyMouse || targetPcNumber === 'SOLO-MOUSE' || targetPcNumber.startsWith('SOLO-MOUSE')
     );
     const isPeripheralsOnly = isOnlyCharger || isOnlyMouse;
 
-    if ((!pcNumber && !isPeripheralsOnly) || !studentName || !studentId || !teacherName || !subjectName) {
+    if ((!targetPcNumber && !isPeripheralsOnly) || !studentName || !studentId || !teacherName || !subjectName) {
       return res.status(400).json({
         error: 'Campos requeridos faltantes: pcNumber (o solo cargador/mouse), studentName, studentId, teacherName, subjectName',
       });
     }
 
-    if (!isPeripheralsOnly && !pcNumber.startsWith('SOLO-')) {
-      const comp = dbStore.getComputerById(pcNumber);
+    if (!isPeripheralsOnly && !targetPcNumber.startsWith('SOLO-')) {
+      const comp = dbStore.getComputerById(targetPcNumber);
       if (!comp) {
-        return res.status(404).json({ error: `Equipo ${pcNumber} no existe` });
-      }
-      if (comp.status === 'en_uso') {
-        return res.status(400).json({ error: `El equipo ${pcNumber} ya se encuentra asignado actualmente` });
+        return res.status(404).json({ error: `Equipo ${targetPcNumber} no existe` });
       }
       if (comp.status === 'en_reparacion' || comp.status === 'de_baja') {
-        return res.status(400).json({ error: `El equipo ${pcNumber} está inoperativo (${comp.status}) y no se puede prestar` });
+        return res.status(400).json({ error: `El equipo ${targetPcNumber} está inoperativo (${comp.status}) y no se puede prestar` });
+      }
+      // If computer was somehow still marked in use, release previous active delivery so user is never blocked
+      if (comp.status === 'en_uso') {
+        const prev = dbStore.getDeliveries({ pcNumber: targetPcNumber, status: 'activo' });
+        prev.forEach((p) => {
+          dbStore.returnDelivery(p.id, {
+            returnObservations: 'Devolución automática por reasignación de equipo',
+          });
+        });
       }
     }
 
@@ -240,7 +254,7 @@ async function startServer() {
         ? 'SOLO-CARGADOR'
         : isOnlyMouse
         ? 'SOLO-MOUSE'
-        : pcNumber,
+        : targetPcNumber,
       studentName,
       studentId,
       studentCareer,
@@ -257,8 +271,11 @@ async function startServer() {
       mouseBrand,
       onlyMouse: isOnlyMouse,
     });
-    res.status(201).json(record);
-  });
+    return res.status(201).json(record);
+  };
+
+  app.post('/api/deliveries', handleCreateDelivery);
+  app.post('/api/deliveries/create', handleCreateDelivery);
 
   app.put('/api/deliveries/:id/return', (req: Request, res: Response) => {
     const returned = dbStore.returnDelivery(req.params.id, req.body);

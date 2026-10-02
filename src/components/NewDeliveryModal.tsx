@@ -434,7 +434,11 @@ export const NewDeliveryModal: React.FC<NewDeliveryModalProps> = ({
       setIsManualStudentName(false);
       setObservations('Sin daños previos detectados.');
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error al guardar la entrega');
+      let msg = err.message || 'Error al guardar la entrega';
+      if (msg.includes('JSON') || msg.includes('Unexpected token') || msg.includes('The page c')) {
+        msg = 'No se pudo conectar con el servidor para registrar la entrega. Verifique su conexión.';
+      }
+      setErrorMsg(msg);
     } finally {
       setIsSubmitting(false);
     }

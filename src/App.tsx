@@ -293,21 +293,31 @@ export default function App() {
 
   // Handlers
   const handleCreateDelivery = async (data: any) => {
-    await api.createDelivery(data);
-    await loadAllData();
-    const isOnlyCharger = data.onlyCharger || data.pcNumber === 'SOLO-CARGADOR';
-    const isOnlyMouse = data.onlyMouse || data.pcNumber === 'SOLO-MOUSE';
-    let title = 'Asignación Creada';
-    let message = `PC ${data.pcNumber} asignada a ${data.studentName}.`;
-    if (isOnlyCharger) {
-      title = '⚡ Cargador Prestado';
-      message = `${data.chargerNumber || 'Cargador'} prestado a ${data.studentName} (PC propia).`;
-    } else if (isOnlyMouse) {
-      title = '🖱️ Mouse Prestado';
-      const brandSuffix = data.mouseBrand ? ` (${data.mouseBrand})` : '';
-      message = `${data.mouseNumber || 'Mouse'}${brandSuffix} prestado a ${data.studentName} (PC propia).`;
+    try {
+      const created = await api.createDelivery(data);
+      await loadAllData();
+      const isOnlyCharger = data.onlyCharger || data.pcNumber === 'SOLO-CARGADOR';
+      const isOnlyMouse = data.onlyMouse || data.pcNumber === 'SOLO-MOUSE';
+      let title = 'Asignación Creada';
+      let message = `PC ${data.pcNumber} asignada a ${data.studentName}.`;
+      if (isOnlyCharger) {
+        title = '⚡ Cargador Prestado';
+        message = `${data.chargerNumber || 'Cargador'} prestado a ${data.studentName} (PC propia).`;
+      } else if (isOnlyMouse) {
+        title = '🖱️ Mouse Prestado';
+        const brandSuffix = data.mouseBrand ? ` (${data.mouseBrand})` : '';
+        message = `${data.mouseNumber || 'Mouse'}${brandSuffix} prestado a ${data.studentName} (PC propia).`;
+      }
+      showToast(title, message, 'success');
+      return created;
+    } catch (err: any) {
+      let msg = err.message || 'Error al guardar asignación';
+      if (msg.includes('JSON') || msg.includes('Unexpected token') || msg.includes('The page c')) {
+        msg = 'No se pudo conectar con el servidor para registrar la entrega. Verifique la conexión.';
+      }
+      showToast('Aviso', msg, 'warn');
+      throw new Error(msg);
     }
-    showToast(title, message, 'success');
   };
 
   const handleReturnDelivery = async (deliveryId: string, returnData: any) => {
