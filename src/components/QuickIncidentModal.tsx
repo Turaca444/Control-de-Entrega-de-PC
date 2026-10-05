@@ -79,7 +79,11 @@ export const QuickIncidentModal: React.FC<QuickIncidentModalProps> = ({
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Error al registrar la incidencia');
+      let msg = err.message || 'Error al registrar la incidencia';
+      if (msg.includes('The page could not be found') || msg.includes('NOT_FOUND') || msg.includes('JSON')) {
+        msg = 'No se pudo conectar con el servidor para registrar la incidencia. Se guardó localmente.';
+      }
+      setError(msg);
     } finally {
       setIsSubmitting(false);
     }

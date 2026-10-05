@@ -932,10 +932,53 @@
       "registeredBy": "Encargado de Laboratorio"
     }
   ],
-  "incidents": [],
+  "incidents": [
+    {
+      "id": "INC-2026-02",
+      "pcNumber": "PC-04",
+      "date": "2026-10-05T16:59:12.892Z",
+      "reportedBy": "Operador Test 2",
+      "type": "hardware",
+      "severity": "baja",
+      "description": "Test mouse óptico sucio",
+      "observations": "",
+      "resolved": false
+    },
+    {
+      "id": "INC-2026-01",
+      "pcNumber": "PC-03",
+      "date": "2026-10-05T16:59:12.875Z",
+      "reportedBy": "Operador Test",
+      "type": "hardware",
+      "severity": "baja",
+      "description": "Test teclado no responde",
+      "observations": "",
+      "resolved": false
+    }
+  ],
   "repairs": [],
   "maintenanceAlerts": [],
   "notifications": [
+    {
+      "title": "Incidencia registrada: PC-04",
+      "message": "Nueva falla detectada (hardware - baja): Test mouse óptico sucio",
+      "type": "damage",
+      "priority": "normal",
+      "pcNumber": "PC-04",
+      "id": "NOTIF-1791219552892",
+      "timestamp": "2026-10-05T16:59:12.892Z",
+      "read": false
+    },
+    {
+      "title": "Incidencia registrada: PC-03",
+      "message": "Nueva falla detectada (hardware - baja): Test teclado no responde",
+      "type": "damage",
+      "priority": "normal",
+      "pcNumber": "PC-03",
+      "id": "NOTIF-1791219552875",
+      "timestamp": "2026-10-05T16:59:12.875Z",
+      "read": false
+    },
     {
       "title": "⚡ Cargador asignado a PC-10",
       "message": "Se asignó Cargador Test 3 a Prueba Cargador (4º Año I) por quedarse sin batería en clase.",
@@ -1091,5 +1134,5 @@
       "avatarColor": "from-red-600 to-amber-700"
     }
   ],
-  "lastUpdated": "2026-10-02T17:37:00.465Z"
+  "lastUpdated": "2026-10-05T16:59:12.892Z"
 }

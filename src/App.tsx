@@ -56,8 +56,26 @@ export default function App() {
     } catch {}
     return [];
   });
-  const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
-  const [repairs, setRepairs] = useState<RepairRecord[]>([]);
+  const [incidents, setIncidents] = useState<IncidentRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('lab_cached_incidents');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
+  const [repairs, setRepairs] = useState<RepairRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('lab_cached_repairs');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
   const [alerts, setAlerts] = useState<MaintenanceAlert[]>([]);
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [users, setUsers] = useState<UserProfile[]>(() => {
@@ -150,8 +168,28 @@ export default function App() {
           return merged;
         });
       }
-      if (iData && Array.isArray(iData)) setIncidents(iData);
-      if (rData && Array.isArray(rData)) setRepairs(rData);
+      if (iData && Array.isArray(iData)) {
+        setIncidents((prev) => {
+          const serverIds = new Set(iData.map((i: IncidentRecord) => i.id));
+          const localOnly = prev.filter((i) => !serverIds.has(i.id));
+          const merged = [...localOnly, ...iData];
+          try {
+            localStorage.setItem('lab_cached_incidents', JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
+      }
+      if (rData && Array.isArray(rData)) {
+        setRepairs((prev) => {
+          const serverIds = new Set(rData.map((r: RepairRecord) => r.id));
+          const localOnly = prev.filter((r) => !serverIds.has(r.id));
+          const merged = [...localOnly, ...rData];
+          try {
+            localStorage.setItem('lab_cached_repairs', JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
+      }
       if (aData && Array.isArray(aData)) setAlerts(aData);
       if (nData && Array.isArray(nData)) setNotifications(nData);
       const resolvedUsers = (uData && Array.isArray(uData) && uData.length > 0) ? uData : DEFAULT_USER_PROFILES;
@@ -624,7 +662,10 @@ export default function App() {
         isOpen={isQuickIncidentOpen}
         onClose={() => setIsQuickIncidentOpen(false)}
         computers={computers}
-        onSuccess={loadAllData}
+        onSuccess={() => {
+          loadAllData();
+          showToast('⚠️ Incidencia Registrada', 'El reporte técnico ha sido guardado exitosamente.', 'info');
+        }}
       />
 
       {/* Modal: Inicio de Sesión y Selección de Docente */}

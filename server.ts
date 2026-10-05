@@ -408,11 +408,13 @@ async function startServer() {
 
   // 5. Incidents
   app.get('/api/incidents', (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     const { pcNumber } = req.query;
     res.json(dbStore.getIncidents(pcNumber as string));
   });
 
-  app.post('/api/incidents', (req: Request, res: Response) => {
+  const handleCreateIncident = (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     const { pcNumber, deliveryId, reportedBy, type, severity, description, observations } = req.body;
     if (!pcNumber || !description) {
       return res.status(400).json({ error: 'pcNumber y description son campos obligatorios' });
@@ -426,16 +428,23 @@ async function startServer() {
       description,
       observations: observations || '',
     });
-    res.status(201).json(created);
-  });
+    return res.status(201).json(created);
+  };
+
+  app.post('/api/incidents', handleCreateIncident);
+  app.post('/api/incidents/create', handleCreateIncident);
+  app.post('/api/incidents/new', handleCreateIncident);
+  app.put('/api/incidents', handleCreateIncident);
 
   // 6. Technical Repairs
   app.get('/api/repairs', (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     const { pcNumber } = req.query;
     res.json(dbStore.getRepairs(pcNumber as string));
   });
 
-  app.post('/api/repairs', (req: Request, res: Response) => {
+  const handleCreateRepair = (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     const { pcNumber, technicianName, faultDiagnosis, workDone, replacedParts, costEstimate, finalStatus, observations } = req.body;
     if (!pcNumber || !technicianName || !faultDiagnosis || !workDone) {
       return res.status(400).json({
@@ -452,16 +461,28 @@ async function startServer() {
       finalStatus: finalStatus || 'en_progreso',
       observations,
     });
-    res.status(201).json(created);
-  });
+    return res.status(201).json(created);
+  };
 
-  app.put('/api/repairs/:id/complete', (req: Request, res: Response) => {
-    const completed = dbStore.completeRepair(req.params.id, req.body);
+  app.post('/api/repairs', handleCreateRepair);
+  app.post('/api/repairs/create', handleCreateRepair);
+  app.post('/api/repairs/new', handleCreateRepair);
+  app.put('/api/repairs', handleCreateRepair);
+
+  const handleCompleteRepair = (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const id = req.params.id || req.body.id || req.body.repairId;
+    if (!id) return res.status(400).json({ error: 'ID de orden de reparación requerido' });
+    const completed = dbStore.completeRepair(id, req.body);
     if (!completed) {
       return res.status(404).json({ error: 'Orden de reparación no encontrada' });
     }
-    res.json(completed);
-  });
+    return res.json(completed);
+  };
+
+  app.put('/api/repairs/:id/complete', handleCompleteRepair);
+  app.post('/api/repairs/:id/complete', handleCompleteRepair);
+  app.post('/api/repairs/complete', handleCompleteRepair);
 
   // 7. Maintenance Alerts
   app.get(['/api/maintenance/alerts', '/api/alerts'], (req: Request, res: Response) => {
