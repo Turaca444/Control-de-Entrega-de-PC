@@ -436,6 +436,21 @@ async function startServer() {
   app.post('/api/incidents/new', handleCreateIncident);
   app.put('/api/incidents', handleCreateIncident);
 
+  const handleDeleteIncident = (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const id = req.params.id || req.body.id || req.body.incidentId;
+    if (!id) return res.status(400).json({ error: 'ID de incidencia requerido' });
+    const success = dbStore.deleteIncident(id);
+    if (!success) {
+      return res.status(404).json({ error: 'Incidencia no encontrada' });
+    }
+    return res.json({ success: true, message: 'Incidencia eliminada correctamente' });
+  };
+
+  app.delete('/api/incidents/:id', handleDeleteIncident);
+  app.post('/api/incidents/:id/delete', handleDeleteIncident);
+  app.post('/api/incidents/delete', handleDeleteIncident);
+
   // 6. Technical Repairs
   app.get('/api/repairs', (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -483,6 +498,21 @@ async function startServer() {
   app.put('/api/repairs/:id/complete', handleCompleteRepair);
   app.post('/api/repairs/:id/complete', handleCompleteRepair);
   app.post('/api/repairs/complete', handleCompleteRepair);
+
+  const handleDeleteRepair = (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const id = req.params.id || req.body.id || req.body.repairId;
+    if (!id) return res.status(400).json({ error: 'ID de orden técnica requerido' });
+    const success = dbStore.deleteRepair(id);
+    if (!success) {
+      return res.status(404).json({ error: 'Orden técnica no encontrada' });
+    }
+    return res.json({ success: true, message: 'Orden técnica eliminada correctamente' });
+  };
+
+  app.delete('/api/repairs/:id', handleDeleteRepair);
+  app.post('/api/repairs/:id/delete', handleDeleteRepair);
+  app.post('/api/repairs/delete', handleDeleteRepair);
 
   // 7. Maintenance Alerts
   app.get(['/api/maintenance/alerts', '/api/alerts'], (req: Request, res: Response) => {

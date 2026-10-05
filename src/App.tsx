@@ -170,9 +170,14 @@ export default function App() {
       }
       if (iData && Array.isArray(iData)) {
         setIncidents((prev) => {
+          let deletedIds = new Set<string>();
+          try {
+            deletedIds = new Set(JSON.parse(localStorage.getItem('lab_deleted_incidents') || '[]'));
+          } catch {}
           const serverIds = new Set(iData.map((i: IncidentRecord) => i.id));
-          const localOnly = prev.filter((i) => !serverIds.has(i.id));
-          const merged = [...localOnly, ...iData];
+          const localOnly = prev.filter((i) => !serverIds.has(i.id) && !deletedIds.has(i.id));
+          const validServer = iData.filter((i: IncidentRecord) => !deletedIds.has(i.id));
+          const merged = [...localOnly, ...validServer];
           try {
             localStorage.setItem('lab_cached_incidents', JSON.stringify(merged));
           } catch {}
@@ -181,9 +186,14 @@ export default function App() {
       }
       if (rData && Array.isArray(rData)) {
         setRepairs((prev) => {
+          let deletedIds = new Set<string>();
+          try {
+            deletedIds = new Set(JSON.parse(localStorage.getItem('lab_deleted_repairs') || '[]'));
+          } catch {}
           const serverIds = new Set(rData.map((r: RepairRecord) => r.id));
-          const localOnly = prev.filter((r) => !serverIds.has(r.id));
-          const merged = [...localOnly, ...rData];
+          const localOnly = prev.filter((r) => !serverIds.has(r.id) && !deletedIds.has(r.id));
+          const validServer = rData.filter((r: RepairRecord) => !deletedIds.has(r.id));
+          const merged = [...localOnly, ...validServer];
           try {
             localStorage.setItem('lab_cached_repairs', JSON.stringify(merged));
           } catch {}
@@ -506,6 +516,52 @@ export default function App() {
     }
   };
 
+  const handleDeleteIncident = async (incidentId: string) => {
+    try {
+      await api.deleteIncident(incidentId);
+      setIncidents((prev) => prev.filter((i) => i.id !== incidentId));
+      try {
+        const cached = localStorage.getItem('lab_cached_incidents');
+        if (cached) {
+          const list: IncidentRecord[] = JSON.parse(cached);
+          localStorage.setItem('lab_cached_incidents', JSON.stringify(list.filter((i) => i.id !== incidentId)));
+        }
+        const deleted = JSON.parse(localStorage.getItem('lab_deleted_incidents') || '[]');
+        if (!deleted.includes(incidentId)) {
+          deleted.push(incidentId);
+          localStorage.setItem('lab_deleted_incidents', JSON.stringify(deleted));
+        }
+      } catch {}
+      await loadAllData();
+      showToast('Incidencia Eliminada', 'El reporte de incidencia ha sido eliminado con éxito.', 'info');
+    } catch (err: any) {
+      showToast('Error al eliminar', err.message || 'No se pudo eliminar la incidencia.', 'error');
+    }
+  };
+
+  const handleDeleteRepair = async (repairId: string) => {
+    try {
+      await api.deleteRepair(repairId);
+      setRepairs((prev) => prev.filter((r) => r.id !== repairId));
+      try {
+        const cached = localStorage.getItem('lab_cached_repairs');
+        if (cached) {
+          const list: RepairRecord[] = JSON.parse(cached);
+          localStorage.setItem('lab_cached_repairs', JSON.stringify(list.filter((r) => r.id !== repairId)));
+        }
+        const deleted = JSON.parse(localStorage.getItem('lab_deleted_repairs') || '[]');
+        if (!deleted.includes(repairId)) {
+          deleted.push(repairId);
+          localStorage.setItem('lab_deleted_repairs', JSON.stringify(deleted));
+        }
+      } catch {}
+      await loadAllData();
+      showToast('Orden Eliminada', 'La orden técnica ha sido eliminada con éxito.', 'info');
+    } catch (err: any) {
+      showToast('Error al eliminar', err.message || 'No se pudo eliminar la orden técnica.', 'error');
+    }
+  };
+
   const handleMarkNotificationRead = async (id: string) => {
     await api.markNotificationRead(id);
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
@@ -606,6 +662,8 @@ export default function App() {
                 computers={computers}
                 onRefresh={loadAllData}
                 onOpenQuickIncident={() => setIsQuickIncidentOpen(true)}
+                onDeleteIncident={handleDeleteIncident}
+                onDeleteRepair={handleDeleteRepair}
               />
             )}
 

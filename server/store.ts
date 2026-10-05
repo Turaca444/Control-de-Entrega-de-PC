@@ -790,6 +790,16 @@ export class DatabaseStore {
     return newInc;
   }
 
+  public deleteIncident(id: string): boolean {
+    const index = this.data.incidents.findIndex((i) => i.id === id);
+    if (index === -1) return false;
+    this.data.incidents.splice(index, 1);
+    this.evaluateAutomaticMaintenanceAlerts();
+    this.save();
+    this.broadcast('incident_deleted', { id });
+    return true;
+  }
+
   // --- Technical Repairs ---
   public getRepairs(pcNumber?: string): RepairRecord[] {
     if (pcNumber) {
@@ -893,6 +903,16 @@ export class DatabaseStore {
     this.save();
     this.broadcast('repair_updated', rep);
     return rep;
+  }
+
+  public deleteRepair(id: string): boolean {
+    const index = this.data.repairs.findIndex((r) => r.id === id);
+    if (index === -1) return false;
+    this.data.repairs.splice(index, 1);
+    this.evaluateAutomaticMaintenanceAlerts();
+    this.save();
+    this.broadcast('repair_deleted', { id });
+    return true;
   }
 
   // --- Maintenance Alerts ---

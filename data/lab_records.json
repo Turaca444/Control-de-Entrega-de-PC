@@ -960,6 +960,16 @@
   "maintenanceAlerts": [],
   "notifications": [
     {
+      "title": "Incidencia registrada: PC-02",
+      "message": "Nueva falla detectada (hardware - alta): Test de reporte y generación de PDF",
+      "type": "damage",
+      "priority": "urgente",
+      "pcNumber": "PC-02",
+      "id": "NOTIF-1791221115679",
+      "timestamp": "2026-10-05T17:25:15.679Z",
+      "read": false
+    },
+    {
       "title": "Incidencia registrada: PC-04",
       "message": "Nueva falla detectada (hardware - baja): Test mouse óptico sucio",
       "type": "damage",
@@ -1134,5 +1144,5 @@
       "avatarColor": "from-red-600 to-amber-700"
     }
   ],
-  "lastUpdated": "2026-10-05T16:59:12.892Z"
+  "lastUpdated": "2026-10-05T17:25:15.695Z"
 }

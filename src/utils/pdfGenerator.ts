@@ -704,3 +704,329 @@ export function generateBorrowedPCsStudentsReportPDF(
   const dateSlug = new Date().toISOString().slice(0, 10);
   doc.save(`Planilla_PCs_Prestadas_Estudiantes_${dateSlug}.pdf`);
 }
+
+/**
+ * 5. Genera el Comprobante Oficial de Incidencia / Reporte Técnico en PDF
+ * Incluye fecha y hora exacta de reporte, datos del equipo y firmas de trazabilidad.
+ */
+export function generateIncidentReportPDF(incident: IncidentRecord, computer?: Computer) {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  // Header banner (Rose / Slate styling)
+  doc.setFillColor(159, 18, 57); // rose-900
+  doc.rect(0, 0, pageWidth, 28, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(15);
+  doc.setFont('helvetica', 'bold');
+  doc.text('SALA DE PROGRAMACIÓN - CONTROL DE EQUIPOS', 14, 12);
+
+  doc.setFontSize(9.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text('COMPROBANTE OFICIAL DE REPORTE DE INCIDENCIA TÉCNICA', 14, 20);
+
+  doc.setFontSize(9);
+  doc.text(`Folio: ${incident.id}`, pageWidth - 14, 12, { align: 'right' });
+  doc.text(`Fecha y Hora de Reporte: ${formatDateTime(incident.date)}`, pageWidth - 14, 20, { align: 'right' });
+
+  // Severity Badge
+  const sev = (incident.severity || 'media').toLowerCase();
+  const sevColor =
+    sev === 'critica'
+      ? [225, 29, 72] // rose-600
+      : sev === 'alta'
+      ? [234, 88, 12] // orange-600
+      : sev === 'media'
+      ? [202, 138, 4] // amber-600
+      : [37, 99, 235]; // blue-600
+
+  doc.setFillColor(sevColor[0], sevColor[1], sevColor[2]);
+  doc.roundedRect(pageWidth - 65, 33, 51, 8, 2, 2, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`SEVERIDAD: ${sev.toUpperCase()}`, pageWidth - 39.5, 38.5, { align: 'center' });
+
+  // Section 1: Datos del Reporte
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text('1. Datos de la Incidencia y Equipo Afectado', 14, 40);
+
+  const pcDetails = computer
+    ? `${incident.pcNumber} (${computer.brand || ''} ${computer.model || ''}) - Serie: ${computer.serialNumber || 'N/D'}`
+    : incident.pcNumber;
+
+  autoTable(doc, {
+    startY: 44,
+    theme: 'grid',
+    headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold' },
+    styles: { font: 'helvetica', fontSize: 9, cellPadding: 3 },
+    body: [
+      [
+        { content: 'Equipo / Identificador:', styles: { fillColor: [248, 250, 252], fontStyle: 'bold' } },
+        pcDetails,
+        { content: 'Tipo de Incidencia:', styles: { fillColor: [248, 250, 252], fontStyle: 'bold' } },
+        (incident.type || 'hardware').toUpperCase(),
+      ],
+      [
+        { content: 'Reportado Por:', styles: { fillColor: [248, 250, 252], fontStyle: 'bold' } },
+        incident.reportedBy || 'Operador de Sala / Docente',
+        { content: 'Fecha y Hora Exacta:', styles: { fillColor: [248, 250, 252], fontStyle: 'bold' } },
+        formatDateTime(incident.date),
+      ],
+      [
+        { content: 'Asociado a Préstamo:', styles: { fillColor: [248, 250, 252], fontStyle: 'bold' } },
+        incident.deliveryId ? `Préstamo ${incident.deliveryId}` : 'Reporte directo en sala (Sin préstamo activo)',
+        { content: 'Estado de Resolución:', styles: { fillColor: [248, 250, 252], fontStyle: 'bold' } },
+        incident.resolved ? 'RESUELTO / EN SERVICIO' : 'ABIERTA / PENDIENTE DE REVISIÓN',
+      ],
+    ],
+  });
+
+  // Section 2: Descripción y Observaciones Técnicas
+  const currentY = (doc as any).lastAutoTable.finalY + 8;
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text('2. Detalle de la Falla y Observaciones Técnicas', 14, currentY);
+
+  autoTable(doc, {
+    startY: currentY + 4,
+    theme: 'grid',
+    styles: { font: 'helvetica', fontSize: 9, cellPadding: 3.5 },
+    body: [
+      [
+        { content: 'Descripción de la Falla o Problema:', styles: { fillColor: [248, 250, 252], fontStyle: 'bold', cellWidth: 55 } },
+        incident.description,
+      ],
+      [
+        { content: 'Observaciones Técnicas Registradas:', styles: { fillColor: [248, 250, 252], fontStyle: 'bold', cellWidth: 55 } },
+        incident.observations || 'Sin observaciones adicionales registradas.',
+      ],
+      [
+        { content: 'Procedimiento Sugerido:', styles: { fillColor: [248, 250, 252], fontStyle: 'bold', cellWidth: 55 } },
+        sev === 'critica' || sev === 'alta'
+          ? 'Retirar inmediatamente de disponibilidad. Trasladar a banco de servicio técnico para diagnóstico y reparación.'
+          : 'Verificar periféricos y conexiones en sala. Si la falla persiste, derivar a orden técnica de mantenimiento.',
+      ],
+    ],
+  });
+
+  // Signatures Section
+  let signY = (doc as any).lastAutoTable.finalY + 22;
+  if (signY > pageHeight - 35) {
+    doc.addPage();
+    signY = 35;
+  }
+
+  doc.setDrawColor(148, 163, 184);
+  doc.setLineWidth(0.4);
+
+  // Line 1: Reportante
+  doc.line(20, signY, 90, signY);
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(51, 65, 85);
+  doc.text('Docente / Operador Reportante', 55, signY + 4.5, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text(incident.reportedBy || 'Firma y Aclaración', 55, signY + 8.5, { align: 'center' });
+
+  // Line 2: Responsable Técnico
+  doc.line(120, signY, 190, signY);
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Responsable de Pañol / Soporte Técnico', 155, signY + 4.5, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text('Firma y Sello de Recepción Técnica', 155, signY + 8.5, { align: 'center' });
+
+  // Footer notes & page number
+  doc.setFontSize(7.5);
+  doc.setTextColor(148, 163, 184);
+  doc.text(
+    `Documento oficial generado el ${new Date().toLocaleString('es-ES')} - Sala de Programación`,
+    pageWidth / 2,
+    pageHeight - 8,
+    { align: 'center' }
+  );
+
+  const cleanPC = (incident.pcNumber || 'PC').replace(/\s+/g, '-');
+  doc.save(`Comprobante_Incidencia_${cleanPC}_${incident.id}.pdf`);
+}
+
+/**
+ * 6. Genera la Orden Técnica Oficial de Reparación en PDF
+ * Incluye diagnóstico, trabajos realizados, repuestos, costos y firmas.
+ */
+export function generateRepairOrderPDF(repair: RepairRecord, computer?: Computer) {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  // Header banner (Blue-900 / Slate)
+  doc.setFillColor(30, 58, 138); // blue-900
+  doc.rect(0, 0, pageWidth, 28, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(15);
+  doc.setFont('helvetica', 'bold');
+  doc.text('SALA DE PROGRAMACIÓN - SERVICIO TÉCNICO', 14, 12);
+
+  doc.setFontSize(9.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text('ORDEN OFICIAL DE REPARACIÓN Y MANTENIMIENTO TÉCNICO', 14, 20);
+
+  doc.setFontSize(9);
+  doc.text(`N° Orden: ${repair.id}`, pageWidth - 14, 12, { align: 'right' });
+  doc.text(`Fecha y Hora de Reporte: ${formatDateTime(repair.startDate)}`, pageWidth - 14, 20, { align: 'right' });
+
+  // Status Badge
+  const st = repair.finalStatus || 'en_progreso';
+  const stColor =
+    st === 'reparado'
+      ? [22, 163, 74] // emerald-600
+      : st === 'en_progreso'
+      ? [234, 88, 12] // orange-600
+      : [220, 38, 38]; // rose-600
+
+  const stLabel =
+    st === 'reparado'
+      ? 'REPARACIÓN FINALIZADA'
+      : st === 'en_progreso'
+      ? 'EN TALLER / EN PROGRESO'
+      : 'REQUIERE BAJA DEFINITIVA';
+
+  doc.setFillColor(stColor[0], stColor[1], stColor[2]);
+  doc.roundedRect(pageWidth - 70, 33, 56, 8, 2, 2, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text(stLabel, pageWidth - 42, 38.5, { align: 'center' });
+
+  // Section 1: Datos de la Orden Técnica
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text('1. Datos Generales de la Orden Técnica', 14, 40);
+
+  const pcDetails = computer
+    ? `${repair.pcNumber} (${computer.brand || ''} ${computer.model || ''}) - Serie: ${computer.serialNumber || 'N/D'}`
+    : repair.pcNumber;
+
+  autoTable(doc, {
+    startY: 44,
+    theme: 'grid',
+    headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255], fontStyle: 'bold' },
+    styles: { font: 'helvetica', fontSize: 9, cellPadding: 3 },
+    body: [
+      [
+        { content: 'Equipo Intervenido:', styles: { fillColor: [248, 250, 252], fontStyle: 'bold' } },
+        pcDetails,
+        { content: 'Técnico Responsable:', styles: { fillColor: [248, 250, 252], fontStyle: 'bold' } },
+        repair.technicianName,
+      ],
+      [
+        { content: 'Fecha y Hora Apertura:', styles: { fillColor: [248, 250, 252], fontStyle: 'bold' } },
+        formatDateTime(repair.startDate),
+        { content: 'Fecha de Cierre:', styles: { fillColor: [248, 250, 252], fontStyle: 'bold' } },
+        formatDateTime(repair.endDate),
+      ],
+      [
+        { content: 'Costo Estimado / Total:', styles: { fillColor: [248, 250, 252], fontStyle: 'bold' } },
+        repair.costEstimate !== undefined ? `$${repair.costEstimate.toFixed(2)} USD` : 'Sin costo adicional (Interno)',
+        { content: 'Estado del Servicio:', styles: { fillColor: [248, 250, 252], fontStyle: 'bold' } },
+        stLabel,
+      ],
+    ],
+  });
+
+  // Section 2: Diagnóstico y Trabajo Efectuado
+  const currentY = (doc as any).lastAutoTable.finalY + 8;
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text('2. Diagnóstico Técnico y Procedimiento Realizado', 14, currentY);
+
+  const partsText =
+    repair.replacedParts && repair.replacedParts.length > 0
+      ? repair.replacedParts.join(', ')
+      : 'Ninguno (Reparación / mantenimiento sin sustitución de partes)';
+
+  autoTable(doc, {
+    startY: currentY + 4,
+    theme: 'grid',
+    styles: { font: 'helvetica', fontSize: 9, cellPadding: 3.5 },
+    body: [
+      [
+        { content: 'Diagnóstico de la Falla:', styles: { fillColor: [248, 250, 252], fontStyle: 'bold', cellWidth: 55 } },
+        repair.faultDiagnosis,
+      ],
+      [
+        { content: 'Trabajo Efectuado / Solución:', styles: { fillColor: [248, 250, 252], fontStyle: 'bold', cellWidth: 55 } },
+        repair.workDone,
+      ],
+      [
+        { content: 'Piezas / Repuestos Utilizados:', styles: { fillColor: [248, 250, 252], fontStyle: 'bold', cellWidth: 55 } },
+        partsText,
+      ],
+      [
+        { content: 'Observaciones Finales:', styles: { fillColor: [248, 250, 252], fontStyle: 'bold', cellWidth: 55 } },
+        repair.observations || 'Equipo probado y verificado según protocolo de laboratorio.',
+      ],
+    ],
+  });
+
+  // Signatures Section
+  let signY = (doc as any).lastAutoTable.finalY + 22;
+  if (signY > pageHeight - 35) {
+    doc.addPage();
+    signY = 35;
+  }
+
+  doc.setDrawColor(148, 163, 184);
+  doc.setLineWidth(0.4);
+
+  // Line 1: Técnico
+  doc.line(20, signY, 90, signY);
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(51, 65, 85);
+  doc.text('Técnico Responsable', 55, signY + 4.5, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text(repair.technicianName || 'Firma y Matrícula', 55, signY + 8.5, { align: 'center' });
+
+  // Line 2: Coordinación / Aprobación
+  doc.line(120, signY, 190, signY);
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Coordinación / Jefatura de Sala', 155, signY + 4.5, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text('Conformidad y Habilitación de Equipo', 155, signY + 8.5, { align: 'center' });
+
+  // Footer notes & page number
+  doc.setFontSize(7.5);
+  doc.setTextColor(148, 163, 184);
+  doc.text(
+    `Documento técnico oficial emitido el ${new Date().toLocaleString('es-ES')} - Sala de Programación`,
+    pageWidth / 2,
+    pageHeight - 8,
+    { align: 'center' }
+  );
+
+  const cleanPC = (repair.pcNumber || 'PC').replace(/\s+/g, '-');
+  doc.save(`Orden_Tecnica_${cleanPC}_${repair.id}.pdf`);
+}

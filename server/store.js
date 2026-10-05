@@ -751,6 +751,15 @@ var DatabaseStore = class {
     this.broadcast("incident_created", newInc);
     return newInc;
   }
+  deleteIncident(id) {
+    const index = this.data.incidents.findIndex((i) => i.id === id);
+    if (index === -1) return false;
+    this.data.incidents.splice(index, 1);
+    this.evaluateAutomaticMaintenanceAlerts();
+    this.save();
+    this.broadcast("incident_deleted", { id });
+    return true;
+  }
   // --- Technical Repairs ---
   getRepairs(pcNumber) {
     if (pcNumber) {
@@ -828,6 +837,15 @@ var DatabaseStore = class {
     this.save();
     this.broadcast("repair_updated", rep);
     return rep;
+  }
+  deleteRepair(id) {
+    const index = this.data.repairs.findIndex((r) => r.id === id);
+    if (index === -1) return false;
+    this.data.repairs.splice(index, 1);
+    this.evaluateAutomaticMaintenanceAlerts();
+    this.save();
+    this.broadcast("repair_deleted", { id });
+    return true;
   }
   // --- Maintenance Alerts ---
   getMaintenanceAlerts() {

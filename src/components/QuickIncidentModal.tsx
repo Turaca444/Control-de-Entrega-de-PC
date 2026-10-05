@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, X, Wrench, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, X, Wrench, ShieldAlert, FileDown } from 'lucide-react';
 import { Computer } from '../types';
 import { api } from '../utils/api';
+import { generateIncidentReportPDF } from '../utils/pdfGenerator';
 
 interface QuickIncidentModalProps {
   isOpen: boolean;
@@ -34,6 +35,7 @@ export const QuickIncidentModal: React.FC<QuickIncidentModalProps> = ({
   const [reportedBy, setReportedBy] = useState('Operador de Sala / Docente');
   const [description, setDescription] = useState('');
   const [observations, setObservations] = useState('');
+  const [autoDownloadPDF, setAutoDownloadPDF] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,7 +67,7 @@ export const QuickIncidentModal: React.FC<QuickIncidentModalProps> = ({
     try {
       setIsSubmitting(true);
       setError(null);
-      await api.createIncident({
+      const created = await api.createIncident({
         pcNumber,
         type,
         severity,
@@ -73,6 +75,17 @@ export const QuickIncidentModal: React.FC<QuickIncidentModalProps> = ({
         observations: observations.trim() || undefined,
         reportedBy: reportedBy.trim() || 'Operador de Sala / Docente',
       });
+
+      // Auto download PDF receipt if enabled
+      if (autoDownloadPDF && created) {
+        const comp = computers.find((c) => c.pcNumber === pcNumber);
+        try {
+          generateIncidentReportPDF(created, comp);
+        } catch (pdfErr) {
+          console.warn('PDF auto-download failed', pdfErr);
+        }
+      }
+
       // Reset fields
       setDescription('');
       setObservations('');
@@ -265,6 +278,21 @@ export const QuickIncidentModal: React.FC<QuickIncidentModalProps> = ({
             />
           </div>
 
+          {/* PDF Download Checkbox */}
+          <div className="flex items-center gap-2 py-1 px-2.5 rounded-lg bg-rose-50/70 dark:bg-rose-950/40 border border-rose-200/60 dark:border-rose-900/40 text-xs text-rose-900 dark:text-rose-200">
+            <input
+              type="checkbox"
+              id="chk-incident-download-pdf"
+              checked={autoDownloadPDF}
+              onChange={(e) => setAutoDownloadPDF(e.target.checked)}
+              className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 cursor-pointer"
+            />
+            <label htmlFor="chk-incident-download-pdf" className="cursor-pointer select-none flex items-center gap-1.5 font-medium">
+              <FileDown className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+              <span>Generar y descargar comprobante PDF con fecha y hora de reporte</span>
+            </label>
+          </div>
+
           {/* Footer actions */}
           <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200 dark:border-slate-700">
             <button
@@ -282,7 +310,7 @@ export const QuickIncidentModal: React.FC<QuickIncidentModalProps> = ({
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white shadow-sm transition-colors cursor-pointer disabled:opacity-50"
             >
               <Wrench className="w-3.5 h-3.5" />
-              <span>{isSubmitting ? 'Registrando...' : 'Registrar y Notificar'}</span>
+              <span>{isSubmitting ? 'Registrando...' : autoDownloadPDF ? 'Registrar y Generar PDF' : 'Registrar y Notificar'}</span>
             </button>
           </div>
         </form>

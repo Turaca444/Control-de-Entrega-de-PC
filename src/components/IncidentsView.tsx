@@ -13,9 +13,11 @@ import {
   X,
   Check,
   FileText,
+  FileDown,
+  Trash2,
 } from 'lucide-react';
 import { IncidentRecord, RepairRecord, Computer } from '../types';
-import { formatDateTime, formatDateOnly } from '../utils/pdfGenerator';
+import { formatDateTime, formatDateOnly, generateIncidentReportPDF, generateRepairOrderPDF } from '../utils/pdfGenerator';
 import { api } from '../utils/api';
 
 interface IncidentsViewProps {
@@ -24,6 +26,8 @@ interface IncidentsViewProps {
   computers: Computer[];
   onRefresh: () => void;
   onOpenQuickIncident?: () => void;
+  onDeleteIncident?: (id: string) => Promise<void>;
+  onDeleteRepair?: (id: string) => Promise<void>;
 }
 
 export const IncidentsView: React.FC<IncidentsViewProps> = ({
@@ -32,6 +36,8 @@ export const IncidentsView: React.FC<IncidentsViewProps> = ({
   computers,
   onRefresh,
   onOpenQuickIncident,
+  onDeleteIncident,
+  onDeleteRepair,
 }) => {
   const [activeTab, setActiveTab] = useState<'incidents' | 'repairs'>('incidents');
   const [selectedPCFilter, setSelectedPCFilter] = useState('');
@@ -45,12 +51,18 @@ export const IncidentsView: React.FC<IncidentsViewProps> = ({
   const [repairParts, setRepairParts] = useState('');
   const [repairCost, setRepairCost] = useState('');
   const [repairStatus, setRepairStatus] = useState<'en_progreso' | 'reparado' | 'requiere_baja'>('en_progreso');
+  const [downloadRepairPDF, setDownloadRepairPDF] = useState(true);
   const [isSubmittingRepair, setIsSubmittingRepair] = useState(false);
 
   // Complete repair modal
   const [repairToComplete, setRepairToComplete] = useState<RepairRecord | null>(null);
   const [completeWork, setCompleteWork] = useState('');
   const [completeFinalStatus, setCompleteFinalStatus] = useState<'reparado' | 'requiere_baja'>('reparado');
+
+  // Deletion modals
+  const [incidentToDelete, setIncidentToDelete] = useState<IncidentRecord | null>(null);
+  const [repairToDelete, setRepairToDelete] = useState<RepairRecord | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const filteredIncidents = incidents.filter((i) =>
     !selectedPCFilter || i.pcNumber === selectedPCFilter
@@ -71,7 +83,7 @@ export const IncidentsView: React.FC<IncidentsViewProps> = ({
         .map((p) => p.trim())
         .filter(Boolean);
 
-      await api.createRepair({
+      const created = await api.createRepair({
         pcNumber: repairPC,
         technicianName: repairTech,
         faultDiagnosis: repairDiag,
@@ -80,6 +92,16 @@ export const IncidentsView: React.FC<IncidentsViewProps> = ({
         costEstimate: repairCost ? Number(repairCost) : undefined,
         finalStatus: repairStatus,
       });
+
+      // Auto download PDF order with exact report date and time!
+      if (downloadRepairPDF && created) {
+        const comp = computers.find((c) => c.pcNumber === repairPC);
+        try {
+          generateRepairOrderPDF(created, comp);
+        } catch (pdfErr) {
+          console.warn('Error generating repair PDF:', pdfErr);
+        }
+      }
 
       setShowNewRepairModal(false);
       setRepairDiag('');
@@ -107,6 +129,42 @@ export const IncidentsView: React.FC<IncidentsViewProps> = ({
       onRefresh();
     } catch (err: any) {
       alert(err.message || 'Error al completar orden');
+    }
+  };
+
+  const handleConfirmDeleteIncident = async () => {
+    if (!incidentToDelete) return;
+    try {
+      setIsDeleting(true);
+      if (onDeleteIncident) {
+        await onDeleteIncident(incidentToDelete.id);
+      } else {
+        await api.deleteIncident(incidentToDelete.id);
+        onRefresh();
+      }
+      setIncidentToDelete(null);
+    } catch (err: any) {
+      alert(err.message || 'Error al eliminar la incidencia');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleConfirmDeleteRepair = async () => {
+    if (!repairToDelete) return;
+    try {
+      setIsDeleting(true);
+      if (onDeleteRepair) {
+        await onDeleteRepair(repairToDelete.id);
+      } else {
+        await api.deleteRepair(repairToDelete.id);
+        onRefresh();
+      }
+      setRepairToDelete(null);
+    } catch (err: any) {
+      alert(err.message || 'Error al eliminar la orden técnica');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -240,9 +298,38 @@ export const IncidentsView: React.FC<IncidentsViewProps> = ({
                   </div>
                 )}
 
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-700/60">
-                  <span>Reportado por: {inc.reportedBy}</span>
-                  {inc.deliveryId && <span>Asociado a entrega: {inc.deliveryId}</span>}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-700/60">
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 space-x-3">
+                    <span>Reportado por: <strong className="text-slate-700 dark:text-slate-300">{inc.reportedBy}</strong></span>
+                    {inc.deliveryId && <span>• Préstamo: <strong className="text-slate-700 dark:text-slate-300">{inc.deliveryId}</strong></span>}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      id={`btn-download-incident-${inc.id}`}
+                      onClick={() => {
+                        const comp = computers.find((c) => c.pcNumber === inc.pcNumber);
+                        generateIncidentReportPDF(inc, comp);
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+                      title="Descargar comprobante en PDF con fecha y hora de reporte"
+                    >
+                      <FileDown className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                      <span>Descargar PDF</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      id={`btn-delete-incident-${inc.id}`}
+                      onClick={() => setIncidentToDelete(inc)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60 transition-colors cursor-pointer"
+                      title="Eliminar este reporte de incidencia"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                      <span>Eliminar</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             ))
@@ -306,7 +393,7 @@ export const IncidentsView: React.FC<IncidentsViewProps> = ({
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-700/60">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-700/60">
                   <div className="space-x-2">
                     <span><strong>Técnico:</strong> {rep.technicianName}</span>
                     {rep.replacedParts && rep.replacedParts.length > 0 && (
@@ -317,18 +404,46 @@ export const IncidentsView: React.FC<IncidentsViewProps> = ({
                     )}
                   </div>
 
-                  {rep.finalStatus === 'en_progreso' && (
+                  <div className="flex items-center gap-2">
                     <button
+                      type="button"
+                      id={`btn-download-repair-${rep.id}`}
                       onClick={() => {
-                        setRepairToComplete(rep);
-                        setCompleteWork(rep.workDone);
-                        setCompleteFinalStatus('reparado');
+                        const comp = computers.find((c) => c.pcNumber === rep.pcNumber);
+                        generateRepairOrderPDF(rep, comp);
                       }}
-                      className="px-3 py-1 rounded-md text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+                      title="Descargar orden técnica en PDF con fecha y hora de reporte"
                     >
-                      Finalizar y Habilitar PC
+                      <FileDown className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                      <span>Descargar PDF</span>
                     </button>
-                  )}
+
+                    {rep.finalStatus === 'en_progreso' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRepairToComplete(rep);
+                          setCompleteWork(rep.workDone);
+                          setCompleteFinalStatus('reparado');
+                        }}
+                        className="px-3 py-1.5 rounded-md text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer"
+                      >
+                        Finalizar y Habilitar PC
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      id={`btn-delete-repair-${rep.id}`}
+                      onClick={() => setRepairToDelete(rep)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60 transition-colors cursor-pointer"
+                      title="Eliminar esta orden técnica"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                      <span>Eliminar</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             ))
@@ -444,6 +559,21 @@ export const IncidentsView: React.FC<IncidentsViewProps> = ({
                 </div>
               </div>
 
+              {/* PDF Download Checkbox */}
+              <div className="flex items-center gap-2 py-1.5 px-3 rounded-lg bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-900/40 text-xs text-blue-900 dark:text-blue-200">
+                <input
+                  type="checkbox"
+                  id="chk-repair-download-pdf"
+                  checked={downloadRepairPDF}
+                  onChange={(e) => setDownloadRepairPDF(e.target.checked)}
+                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                />
+                <label htmlFor="chk-repair-download-pdf" className="cursor-pointer select-none flex items-center gap-1.5 font-medium">
+                  <FileDown className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                  <span>Generar y descargar comprobante PDF con fecha y hora de reporte</span>
+                </label>
+              </div>
+
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
                 <button
                   type="button"
@@ -457,10 +587,130 @@ export const IncidentsView: React.FC<IncidentsViewProps> = ({
                   disabled={isSubmittingRepair}
                   className="px-4 py-2 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-sm cursor-pointer disabled:opacity-50"
                 >
-                  {isSubmittingRepair ? 'Guardando...' : 'Crear Orden'}
+                  {isSubmittingRepair ? 'Guardando...' : 'Crear Orden y Generar PDF'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmación de Eliminación de Incidencia */}
+      {incidentToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-850 rounded-2xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-700 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/80 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  ¿Eliminar Reporte de Incidencia?
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Esta acción eliminará el reporte permanentemente del historial.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs space-y-1.5">
+              <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                <span className="font-semibold">Equipo afectado:</span>
+                <span className="font-mono font-bold text-slate-900 dark:text-white">{incidentToDelete.pcNumber}</span>
+              </div>
+              <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                <span className="font-semibold">Fecha y Hora de reporte:</span>
+                <span>{formatDateTime(incidentToDelete.date)}</span>
+              </div>
+              <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                <span className="font-semibold">Severidad / Tipo:</span>
+                <span className="uppercase font-semibold">{incidentToDelete.severity} • {incidentToDelete.type}</span>
+              </div>
+              <div className="text-slate-600 dark:text-slate-300 pt-1.5 border-t border-slate-200 dark:border-slate-800">
+                <span className="font-semibold block mb-0.5">Descripción de la falla:</span>
+                <p className="italic text-slate-800 dark:text-slate-200">{incidentToDelete.description}</p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setIncidentToDelete(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 cursor-pointer disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteIncident}
+                disabled={isDeleting}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isDeleting ? 'Eliminando...' : 'Sí, Eliminar Incidencia'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmación de Eliminación de Orden Técnica */}
+      {repairToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-850 rounded-2xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-700 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/80 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  ¿Eliminar Orden Técnica?
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Se removerá la orden técnica {repairToDelete.id} del historial.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs space-y-1.5">
+              <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                <span className="font-semibold">N° Orden / Equipo:</span>
+                <span className="font-mono font-bold text-slate-900 dark:text-white">{repairToDelete.id} ({repairToDelete.pcNumber})</span>
+              </div>
+              <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                <span className="font-semibold">Técnico:</span>
+                <span>{repairToDelete.technicianName}</span>
+              </div>
+              <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                <span className="font-semibold">Fecha y Hora de reporte:</span>
+                <span>{formatDateTime(repairToDelete.startDate)}</span>
+              </div>
+              <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                <span className="font-semibold">Diagnóstico:</span>
+                <span>{repairToDelete.faultDiagnosis}</span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setRepairToDelete(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 cursor-pointer disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteRepair}
+                disabled={isDeleting}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isDeleting ? 'Eliminando...' : 'Sí, Eliminar Orden'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

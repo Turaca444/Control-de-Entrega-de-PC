@@ -11,7 +11,9 @@ export type AlertPriority = 'baja' | 'media' | 'alta' | 'urgente';
 export interface Computer {
   id: string; // e.g. "PC-01"
   pcNumber: string; // "PC-01"
+  brand?: string; // e.g. "Dell"
   model: string; // e.g. "Dell OptiPlex 7090"
+  serialNumber?: string; // e.g. "SN-DEL-98421"
   processor: string; // e.g. "Intel Core i7-11700"
   ram: string; // "16GB DDR4"
   storage: string; // "512GB NVMe SSD"

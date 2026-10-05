@@ -746,6 +746,40 @@ export const api = {
     return localIncident;
   },
 
+  async deleteIncident(id: string): Promise<boolean> {
+    try {
+      let res = await fetch(`/api/incidents/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok && (res.status === 404 || res.status === 405)) {
+        res = await fetch(`/api/incidents/${encodeURIComponent(id)}/delete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (!res.ok && (res.status === 404 || res.status === 405)) {
+        res = await fetch('/api/incidents/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id }),
+        });
+      }
+    } catch (e) {
+      console.warn('Backend deleteIncident failed, applying local removal:', e);
+    }
+
+    try {
+      const cached = localStorage.getItem('lab_cached_incidents');
+      if (cached) {
+        const list: IncidentRecord[] = JSON.parse(cached);
+        const filtered = list.filter((i) => i.id !== id);
+        localStorage.setItem('lab_cached_incidents', JSON.stringify(filtered));
+      }
+    } catch {}
+
+    return true;
+  },
+
   // Repairs
   async getRepairs(pcNumber?: string): Promise<RepairRecord[]> {
     const query = pcNumber ? `?pcNumber=${encodeURIComponent(pcNumber)}` : '';
@@ -899,6 +933,40 @@ export const api = {
       finalStatus: data.finalStatus,
       observations: data.observations || '',
     };
+  },
+
+  async deleteRepair(id: string): Promise<boolean> {
+    try {
+      let res = await fetch(`/api/repairs/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok && (res.status === 404 || res.status === 405)) {
+        res = await fetch(`/api/repairs/${encodeURIComponent(id)}/delete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (!res.ok && (res.status === 404 || res.status === 405)) {
+        res = await fetch('/api/repairs/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id }),
+        });
+      }
+    } catch (e) {
+      console.warn('Backend deleteRepair failed, applying local removal:', e);
+    }
+
+    try {
+      const cached = localStorage.getItem('lab_cached_repairs');
+      if (cached) {
+        const list: RepairRecord[] = JSON.parse(cached);
+        const filtered = list.filter((r) => r.id !== id);
+        localStorage.setItem('lab_cached_repairs', JSON.stringify(filtered));
+      }
+    } catch {}
+
+    return true;
   },
 
   // Maintenance Alerts
