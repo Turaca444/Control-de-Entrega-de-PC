@@ -104,6 +104,7 @@ export const STUDENTS_BY_COURSE: Record<string, string[]> = {
     'Alvarez Gael',
     'Franco Jazmin',
     'Franco Jeremias',
+    'Gomez Valentino',
     'Lazo Fernandez Martina',
     'Lesta Juan Cruz',
     'López Lautaro',
@@ -158,17 +159,18 @@ export const STUDENTS_BY_COURSE: Record<string, string[]> = {
   ],
 };
 
-const STORAGE_KEY_STUDENTS = 'lab_students_by_course_v4';
+const STORAGE_KEY_STUDENTS = 'lab_students_by_course_v5';
 
 export function getStoredStudentsByCourse(): Record<string, string[]> {
   try {
     let saved = localStorage.getItem(STORAGE_KEY_STUDENTS);
     if (!saved) {
-      // Migrate from v3, v2 or v1 if present
+      // Migrate from v4, v3, v2 or v1 if present
+      const v4 = localStorage.getItem('lab_students_by_course_v4');
       const v3 = localStorage.getItem('lab_students_by_course_v3');
       const v2 = localStorage.getItem('lab_students_by_course_v2');
       const v1 = localStorage.getItem('lab_students_by_course_v1');
-      const prevRaw = v3 || v2 || v1;
+      const prevRaw = v4 || v3 || v2 || v1;
       if (prevRaw) {
         try {
           const parsedPrev = JSON.parse(prevRaw);
@@ -176,15 +178,17 @@ export function getStoredStudentsByCourse(): Record<string, string[]> {
             ...STUDENTS_BY_COURSE,
             ...parsedPrev,
           };
-          // Ensure courses with default rosters are fully loaded
-          if (!merged['4º Año I'] || merged['4º Año I'].length === 0) {
-            merged['4º Año I'] = [...STUDENTS_BY_COURSE['4º Año I']];
-          }
-          if (!merged['5º Año L'] || merged['5º Año L'].length === 0) {
-            merged['5º Año L'] = [...STUDENTS_BY_COURSE['5º Año L']];
-          }
-          if (!merged['6º Año J'] || merged['6º Año J'].length === 0) {
-            merged['6º Año J'] = [...STUDENTS_BY_COURSE['6º Año J']];
+          for (const courseKey of ['4º Año I', '5º Año L', '6º Año J']) {
+            if (!merged[courseKey] || merged[courseKey].length === 0) {
+              merged[courseKey] = [...STUDENTS_BY_COURSE[courseKey]];
+            } else {
+              for (const std of STUDENTS_BY_COURSE[courseKey] || []) {
+                if (!merged[courseKey].includes(std)) {
+                  merged[courseKey].push(std);
+                }
+              }
+              merged[courseKey].sort((a: string, b: string) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+            }
           }
           saved = JSON.stringify(merged);
           localStorage.setItem(STORAGE_KEY_STUDENTS, saved);
@@ -195,15 +199,18 @@ export function getStoredStudentsByCourse(): Record<string, string[]> {
     }
     if (saved) {
       const parsed = JSON.parse(saved);
-      // Ensure default course rosters are present and populated
-      if (!parsed['4º Año I'] || parsed['4º Año I'].length === 0) {
-        parsed['4º Año I'] = [...STUDENTS_BY_COURSE['4º Año I']];
-      }
-      if (!parsed['5º Año L'] || parsed['5º Año L'].length === 0) {
-        parsed['5º Año L'] = [...STUDENTS_BY_COURSE['5º Año L']];
-      }
-      if (!parsed['6º Año J'] || parsed['6º Año J'].length === 0) {
-        parsed['6º Año J'] = [...STUDENTS_BY_COURSE['6º Año J']];
+      // Ensure default course rosters are present and populated with official students
+      for (const courseKey of ['4º Año I', '5º Año L', '6º Año J']) {
+        if (!parsed[courseKey] || parsed[courseKey].length === 0) {
+          parsed[courseKey] = [...STUDENTS_BY_COURSE[courseKey]];
+        } else {
+          for (const std of STUDENTS_BY_COURSE[courseKey] || []) {
+            if (!parsed[courseKey].includes(std)) {
+              parsed[courseKey].push(std);
+            }
+          }
+          parsed[courseKey].sort((a: string, b: string) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+        }
       }
       // Ensure typo is corrected if present in cached data
       if (parsed['5º Año L']) {

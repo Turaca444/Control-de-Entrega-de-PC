@@ -210,6 +210,7 @@ var STUDENTS_4_I = [
   "Alvarez Gael",
   "Franco Jazmin",
   "Franco Jeremias",
+  "Gomez Valentino",
   "Lazo Fernandez Martina",
   "Lesta Juan Cruz",
   "L\xF3pez Lautaro",
