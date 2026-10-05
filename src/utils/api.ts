@@ -7,6 +7,8 @@ import {
   AdminNotification,
   SystemStats,
   UserProfile,
+  getStoredStudentsByCourse,
+  STUDENTS_BY_COURSE,
 } from '../types';
 
 async function parseResponseOrThrow<T = any>(res: Response, fallbackError: string): Promise<T> {
@@ -1161,5 +1163,37 @@ export const api = {
     });
     await parseResponseOrThrow(res, 'Error al eliminar usuario');
     return true;
+  },
+
+  // Students & Course Rosters
+  async getStudents(course?: string): Promise<Record<string, string[]> | string[]> {
+    try {
+      const query = course ? `?course=${encodeURIComponent(course)}` : '';
+      const res = await fetch(`/api/students${query}`);
+      if (res.ok) {
+        return await parseResponseOrThrow(res, 'Error al obtener alumnos');
+      }
+    } catch (e) {
+      console.warn('Backend getStudents fallback:', e);
+    }
+    const local = getStoredStudentsByCourse();
+    if (course) return local[course] || [];
+    return local;
+  },
+
+  async addStudent(course: string, studentName: string): Promise<any> {
+    try {
+      const res = await fetch('/api/students', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ course, studentName }),
+      });
+      if (res.ok) {
+        return await parseResponseOrThrow(res, 'Error al registrar estudiante');
+      }
+    } catch (e) {
+      console.warn('Backend addStudent fallback:', e);
+    }
+    return { success: true, course, studentName };
   },
 };

@@ -32,6 +32,7 @@ import {
   DEFAULT_COMPUTERS,
 } from '../types';
 import { ConfirmModal } from './ConfirmModal';
+import { api } from '../utils/api';
 
 interface NewDeliveryModalProps {
   isOpen: boolean;
@@ -146,6 +147,16 @@ export const NewDeliveryModal: React.FC<NewDeliveryModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setStudentsByCourseMap(getStoredStudentsByCourse());
+      api.getStudents().then((serverRoster: any) => {
+        if (serverRoster && typeof serverRoster === 'object' && !Array.isArray(serverRoster)) {
+          setStudentsByCourseMap((prev) => {
+            const merged = { ...prev, ...(serverRoster as Record<string, string[]>) };
+            saveStoredStudentsByCourse(merged);
+            return merged;
+          });
+        }
+      }).catch(() => {});
+
       if (currentUser) {
         setTeacherName(currentUser.name);
         if (currentUser.defaultSubject && currentUser.defaultSubject !== 'Programación y Sistemas Informáticos') {
@@ -239,11 +250,12 @@ export const NewDeliveryModal: React.FC<NewDeliveryModalProps> = ({
       if (existing.includes(name)) return prev;
       const updated = {
         ...prev,
-        [course]: [...existing, name].sort(),
+        [course]: [...existing, name].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' })),
       };
       saveStoredStudentsByCourse(updated);
       return updated;
     });
+    api.addStudent(course, name).catch(() => {});
     setStudentName(name);
     setNewStudentInput('');
     setShowAddStudentForm(false);

@@ -718,7 +718,44 @@ async function startServer() {
     res.json({ success: true, message: 'Perfil de docente eliminado' });
   });
 
-  // 9. Reset data
+  // 9. Students & Course Rosters
+  app.get('/api/courses', (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.json([
+      '4º Año I',
+      '4º Año K',
+      '5º Año K',
+      '5º Año L',
+      '6º Año E',
+      '6º Año J',
+    ]);
+  });
+
+  app.get(['/api/students', '/api/courses/students'], (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const course = req.query.course as string | undefined;
+    const roster = dbStore.getStudentsByCourse(course);
+    res.json(roster);
+  });
+
+  app.get('/api/students/:course', (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const course = decodeURIComponent(req.params.course);
+    const roster = dbStore.getStudentsByCourse(course);
+    res.json(roster);
+  });
+
+  app.post(['/api/students', '/api/courses/students'], (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const { course, studentName } = req.body;
+    if (!course || !studentName) {
+      return res.status(400).json({ error: 'course y studentName son campos requeridos' });
+    }
+    const updated = dbStore.addStudentToCourse(course, studentName);
+    res.status(201).json({ success: true, course, students: updated });
+  });
+
+  // 10. Reset data
   app.post('/api/reset-data', (req: Request, res: Response) => {
     dbStore.resetToDefaults();
     res.json({ success: true, message: 'Datos de prueba restablecidos correctamente' });

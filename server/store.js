@@ -3,6 +3,68 @@ import fs from "fs";
 import path from "path";
 
 // src/types.ts
+var STUDENTS_BY_COURSE = {
+  "4\xBA A\xF1o I": [
+    "Agudelo Juan Martin",
+    "Aguirre Samuel",
+    "Allende Aguero Benjamin",
+    "Alvarez Gael",
+    "Franco Jazmin",
+    "Franco Jeremias",
+    "Gomez Valentino",
+    "Lazo Fernandez Martina",
+    "Lesta Juan Cruz",
+    "L\xF3pez Lautaro",
+    "Moriconi Octavio",
+    "Palacios Uriel",
+    "Puchi Ludmila",
+    "Reyna Thiago Benjamin",
+    "Robles Luciano",
+    "Romero Benjamin",
+    "Sanchez Ortega",
+    "Soria Ingrid",
+    "Sosa Lapenta Mateo",
+    "Torres Martiniano"
+  ],
+  "5\xBA A\xF1o L": [
+    "Acu\xF1a Bianca Agostina",
+    "Cano Benjamin",
+    "Chiquilito Lara Jazmin",
+    "Chiquilito Valentina Tiziana",
+    "Ferrero Lola",
+    "Herrera Francisco",
+    "Le\xF3n Antonella",
+    "Moreno Sofia",
+    "Romero Maximo",
+    "Sanchez Sebasti\xE1n",
+    "Tschinki Jairo",
+    "Valdez Franco"
+  ],
+  "6\xBA A\xF1o J": [
+    "Audisio Pablo",
+    "Blanco Santiago",
+    "Bustos Brisa Belen",
+    "Ceballos Enzo",
+    "Choque Facundo",
+    "C\xF3rdoba Matias",
+    "Cruces Julian",
+    "Cuello Agustina",
+    "Farias Vacchiano Francesco",
+    "Gigena Marcos",
+    "Gimenez Matias",
+    "Heredia Ariadna Steffi",
+    "Jordan Lara",
+    "Maldonado Benjamin",
+    "Navarro Isaias",
+    "Paez Mendoza",
+    "Passetti Santiago",
+    "Raviche Sofia",
+    "Rojas Ludmila",
+    "Sanchez Lautaro",
+    "Tardino Domingo",
+    "Torres Facundo"
+  ]
+};
 var DEFAULT_USER_PROFILES = [
   {
     id: "admin-lab",
@@ -287,6 +349,7 @@ var DatabaseStore = class {
         const raw = fs.readFileSync(DATA_FILE, "utf-8");
         const parsed = JSON.parse(raw);
         if (parsed && Array.isArray(parsed.computers) && Array.isArray(parsed.deliveries)) {
+          let modified = false;
           if (parsed.deliveries.length === 0 && INITIAL_DELIVERIES.length > 0) {
             parsed.deliveries = INITIAL_DELIVERIES;
             parsed.computers.forEach((comp) => {
@@ -298,10 +361,57 @@ var DatabaseStore = class {
                 comp.totalLoansCount = Math.max(comp.totalLoansCount || 0, 1);
               }
             });
-            this.saveDataDirect(parsed);
+            modified = true;
+          }
+          const hasGomezDelivery = parsed.deliveries.some(
+            (d) => d.studentName?.toLowerCase().includes("gomez valentino")
+          );
+          if (!hasGomezDelivery) {
+            parsed.deliveries.push({
+              id: "DEL-2026-020",
+              pcNumber: "PC-20",
+              computerId: "PC-20",
+              studentName: "Gomez Valentino",
+              studentId: "4\xBA A\xF1o I",
+              studentCareer: "Programaci\xF3n I",
+              teacherName: "Bringas Santiago",
+              subjectName: "Arquitectura de Computadoras y Hardware",
+              deliveryDate: (/* @__PURE__ */ new Date("2026-09-28T08:00:00.000Z")).toISOString(),
+              expectedReturnTime: (/* @__PURE__ */ new Date("2026-09-28T12:00:00.000Z")).toISOString(),
+              returnDate: (/* @__PURE__ */ new Date("2026-09-28T12:00:00.000Z")).toISOString(),
+              status: "devuelto_bien",
+              observations: "Equipo entregado en condiciones \xF3ptimas. Sin da\xF1os previos detectados.",
+              returnObservations: "Devoluci\xF3n completa en \xF3ptimas condiciones al finalizar la clase.",
+              reportedDamageOnReturn: false,
+              includesCharger: true,
+              chargerNumber: "Cargador 20",
+              chargerReturned: true,
+              includesMouse: false,
+              mouseReturned: true,
+              registeredBy: "Encargado de Laboratorio"
+            });
+            modified = true;
+          }
+          if (!parsed.studentsByCourse) {
+            parsed.studentsByCourse = {
+              ...STUDENTS_BY_COURSE,
+              "4\xBA A\xF1o I": [...STUDENTS_4_I]
+            };
+            modified = true;
+          } else {
+            if (parsed.studentsByCourse["4\xBA A\xF1o I"] && !parsed.studentsByCourse["4\xBA A\xF1o I"].includes("Gomez Valentino")) {
+              parsed.studentsByCourse["4\xBA A\xF1o I"].push("Gomez Valentino");
+              parsed.studentsByCourse["4\xBA A\xF1o I"].sort(
+                (a, b) => a.localeCompare(b, "es", { sensitivity: "base" })
+              );
+              modified = true;
+            }
           }
           if (!parsed.users || !Array.isArray(parsed.users) || parsed.users.length === 0) {
             parsed.users = DEFAULT_USER_PROFILES;
+            modified = true;
+          }
+          if (modified) {
             this.saveDataDirect(parsed);
           }
           return parsed;
@@ -318,6 +428,10 @@ var DatabaseStore = class {
       maintenanceAlerts: INITIAL_ALERTS,
       notifications: INITIAL_NOTIFICATIONS,
       users: DEFAULT_USER_PROFILES,
+      studentsByCourse: {
+        ...STUDENTS_BY_COURSE,
+        "4\xBA A\xF1o I": [...STUDENTS_4_I]
+      },
       lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
     };
     this.saveDataDirect(initial);
@@ -1046,6 +1160,51 @@ var DatabaseStore = class {
     }
     return false;
   }
+  getStudentsByCourse(course) {
+    const defaultRoster = {
+      ...STUDENTS_BY_COURSE,
+      "4\xBA A\xF1o I": [...STUDENTS_4_I]
+    };
+    const roster = this.data.studentsByCourse || defaultRoster;
+    if (course) {
+      const normalized = course.trim().toLowerCase();
+      for (const [cName, list] of Object.entries(roster)) {
+        if (cName.toLowerCase() === normalized || cName.toLowerCase().replace(/[^a-z0-9]/g, "") === normalized.replace(/[^a-z0-9]/g, "") || normalized.includes("4") && normalized.includes("i") && cName.includes("4\xBA A\xF1o I")) {
+          return list;
+        }
+      }
+      return [];
+    }
+    return roster;
+  }
+  addStudentToCourse(course, studentName) {
+    if (!this.data.studentsByCourse) {
+      this.data.studentsByCourse = {
+        ...STUDENTS_BY_COURSE,
+        "4\xBA A\xF1o I": [...STUDENTS_4_I]
+      };
+    }
+    const cleanName = studentName.trim();
+    let targetKey = course;
+    const normalized = course.trim().toLowerCase();
+    for (const cName of Object.keys(this.data.studentsByCourse)) {
+      if (cName.toLowerCase() === normalized || cName.toLowerCase().replace(/[^a-z0-9]/g, "") === normalized.replace(/[^a-z0-9]/g, "") || normalized.includes("4") && normalized.includes("i") && cName.includes("4\xBA A\xF1o I")) {
+        targetKey = cName;
+        break;
+      }
+    }
+    if (!this.data.studentsByCourse[targetKey]) {
+      this.data.studentsByCourse[targetKey] = [];
+    }
+    if (!this.data.studentsByCourse[targetKey].includes(cleanName)) {
+      this.data.studentsByCourse[targetKey].push(cleanName);
+      this.data.studentsByCourse[targetKey].sort(
+        (a, b) => a.localeCompare(b, "es", { sensitivity: "base" })
+      );
+      this.save();
+    }
+    return this.data.studentsByCourse[targetKey];
+  }
   resetToDefaults() {
     this.data = {
       computers: INITIAL_COMPUTERS,
@@ -1055,6 +1214,10 @@ var DatabaseStore = class {
       maintenanceAlerts: INITIAL_ALERTS,
       notifications: INITIAL_NOTIFICATIONS,
       users: DEFAULT_USER_PROFILES,
+      studentsByCourse: {
+        ...STUDENTS_BY_COURSE,
+        "4\xBA A\xF1o I": [...STUDENTS_4_I]
+      },
       lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
     };
     this.save();

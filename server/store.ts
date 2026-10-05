@@ -10,6 +10,7 @@ import {
   UserProfile,
   DEFAULT_USER_PROFILES,
   DEFAULT_COMPUTERS,
+  STUDENTS_BY_COURSE,
 } from '../src/types.js';
 
 interface DatabaseSchema {
@@ -20,6 +21,7 @@ interface DatabaseSchema {
   maintenanceAlerts: MaintenanceAlert[];
   notifications: AdminNotification[];
   users: UserProfile[];
+  studentsByCourse?: Record<string, string[]>;
   lastUpdated: string;
 }
 
@@ -180,6 +182,8 @@ export class DatabaseStore {
           Array.isArray(parsed.computers) &&
           Array.isArray(parsed.deliveries)
         ) {
+          let modified = false;
+
           // If deliveries array is empty, restore INITIAL_DELIVERIES for 4º Año I
           if (parsed.deliveries.length === 0 && INITIAL_DELIVERIES.length > 0) {
             parsed.deliveries = INITIAL_DELIVERIES;
@@ -193,11 +197,66 @@ export class DatabaseStore {
                 comp.totalLoansCount = Math.max(comp.totalLoansCount || 0, 1);
               }
             });
-            this.saveDataDirect(parsed);
+            modified = true;
+          }
+
+          // Ensure Gomez Valentino is in deliveries for 4º Año I if 4º Año I deliveries are tracked
+          const hasGomezDelivery = parsed.deliveries.some((d: DeliveryRecord) =>
+            d.studentName?.toLowerCase().includes('gomez valentino')
+          );
+          if (!hasGomezDelivery) {
+            parsed.deliveries.push({
+              id: 'DEL-2026-020',
+              pcNumber: 'PC-20',
+              computerId: 'PC-20',
+              studentName: 'Gomez Valentino',
+              studentId: '4º Año I',
+              studentCareer: 'Programación I',
+              teacherName: 'Bringas Santiago',
+              subjectName: 'Arquitectura de Computadoras y Hardware',
+              deliveryDate: new Date('2026-09-28T08:00:00.000Z').toISOString(),
+              expectedReturnTime: new Date('2026-09-28T12:00:00.000Z').toISOString(),
+              returnDate: new Date('2026-09-28T12:00:00.000Z').toISOString(),
+              status: 'devuelto_bien',
+              observations: 'Equipo entregado en condiciones óptimas. Sin daños previos detectados.',
+              returnObservations: 'Devolución completa en óptimas condiciones al finalizar la clase.',
+              reportedDamageOnReturn: false,
+              includesCharger: true,
+              chargerNumber: 'Cargador 20',
+              chargerReturned: true,
+              includesMouse: false,
+              mouseReturned: true,
+              registeredBy: 'Encargado de Laboratorio',
+            });
+            modified = true;
+          }
+
+          // Ensure studentsByCourse is populated and has Gomez Valentino
+          if (!parsed.studentsByCourse) {
+            parsed.studentsByCourse = {
+              ...STUDENTS_BY_COURSE,
+              '4º Año I': [...STUDENTS_4_I],
+            };
+            modified = true;
+          } else {
+            if (
+              parsed.studentsByCourse['4º Año I'] &&
+              !parsed.studentsByCourse['4º Año I'].includes('Gomez Valentino')
+            ) {
+              parsed.studentsByCourse['4º Año I'].push('Gomez Valentino');
+              parsed.studentsByCourse['4º Año I'].sort((a: string, b: string) =>
+                a.localeCompare(b, 'es', { sensitivity: 'base' })
+              );
+              modified = true;
+            }
           }
 
           if (!parsed.users || !Array.isArray(parsed.users) || parsed.users.length === 0) {
             parsed.users = DEFAULT_USER_PROFILES;
+            modified = true;
+          }
+
+          if (modified) {
             this.saveDataDirect(parsed);
           }
           return parsed;
@@ -215,6 +274,10 @@ export class DatabaseStore {
       maintenanceAlerts: INITIAL_ALERTS,
       notifications: INITIAL_NOTIFICATIONS,
       users: DEFAULT_USER_PROFILES,
+      studentsByCourse: {
+        ...STUDENTS_BY_COURSE,
+        '4º Año I': [...STUDENTS_4_I],
+      },
       lastUpdated: new Date().toISOString(),
     };
     this.saveDataDirect(initial);
@@ -1134,6 +1197,61 @@ export class DatabaseStore {
     return false;
   }
 
+  public getStudentsByCourse(course?: string): Record<string, string[]> | string[] {
+    const defaultRoster: Record<string, string[]> = {
+      ...STUDENTS_BY_COURSE,
+      '4º Año I': [...STUDENTS_4_I],
+    };
+    const roster = this.data.studentsByCourse || defaultRoster;
+    if (course) {
+      const normalized = course.trim().toLowerCase();
+      for (const [cName, list] of Object.entries(roster)) {
+        if (
+          cName.toLowerCase() === normalized ||
+          cName.toLowerCase().replace(/[^a-z0-9]/g, '') === normalized.replace(/[^a-z0-9]/g, '') ||
+          (normalized.includes('4') && normalized.includes('i') && cName.includes('4º Año I'))
+        ) {
+          return list;
+        }
+      }
+      return [];
+    }
+    return roster;
+  }
+
+  public addStudentToCourse(course: string, studentName: string): string[] {
+    if (!this.data.studentsByCourse) {
+      this.data.studentsByCourse = {
+        ...STUDENTS_BY_COURSE,
+        '4º Año I': [...STUDENTS_4_I],
+      };
+    }
+    const cleanName = studentName.trim();
+    let targetKey = course;
+    const normalized = course.trim().toLowerCase();
+    for (const cName of Object.keys(this.data.studentsByCourse)) {
+      if (
+        cName.toLowerCase() === normalized ||
+        cName.toLowerCase().replace(/[^a-z0-9]/g, '') === normalized.replace(/[^a-z0-9]/g, '') ||
+        (normalized.includes('4') && normalized.includes('i') && cName.includes('4º Año I'))
+      ) {
+        targetKey = cName;
+        break;
+      }
+    }
+    if (!this.data.studentsByCourse[targetKey]) {
+      this.data.studentsByCourse[targetKey] = [];
+    }
+    if (!this.data.studentsByCourse[targetKey].includes(cleanName)) {
+      this.data.studentsByCourse[targetKey].push(cleanName);
+      this.data.studentsByCourse[targetKey].sort((a: string, b: string) =>
+        a.localeCompare(b, 'es', { sensitivity: 'base' })
+      );
+      this.save();
+    }
+    return this.data.studentsByCourse[targetKey];
+  }
+
   public resetToDefaults() {
     this.data = {
       computers: INITIAL_COMPUTERS,
@@ -1143,6 +1261,10 @@ export class DatabaseStore {
       maintenanceAlerts: INITIAL_ALERTS,
       notifications: INITIAL_NOTIFICATIONS,
       users: DEFAULT_USER_PROFILES,
+      studentsByCourse: {
+        ...STUDENTS_BY_COURSE,
+        '4º Año I': [...STUDENTS_4_I],
+      },
       lastUpdated: new Date().toISOString(),
     };
     this.save();
