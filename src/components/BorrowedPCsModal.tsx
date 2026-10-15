@@ -17,6 +17,7 @@ import {
   Zap,
   Trash2,
   Mouse,
+  Pencil,
 } from 'lucide-react';
 import { DeliveryRecord, Computer, UserProfile } from '../types';
 import {
@@ -25,6 +26,7 @@ import {
   formatDateTime,
 } from '../utils/pdfGenerator';
 import { ConfirmModal } from './ConfirmModal';
+import { EditSubjectModal } from './EditSubjectModal';
 
 interface BorrowedPCsModalProps {
   isOpen: boolean;
@@ -39,6 +41,7 @@ interface BorrowedPCsModalProps {
   onDeleteDelivery?: (deliveryId: string) => Promise<void> | void;
   onReturnCourse?: (courseName: string, teacherName?: string) => Promise<void> | void;
   onDeleteCourse?: (courseName: string, teacherName?: string) => Promise<void> | void;
+  onUpdateSubject?: (deliveryId: string, newSubjectName: string, updateWholeCourse: boolean) => Promise<void> | void;
 }
 
 export const BorrowedPCsModal: React.FC<BorrowedPCsModalProps> = ({
@@ -54,11 +57,15 @@ export const BorrowedPCsModal: React.FC<BorrowedPCsModalProps> = ({
   onDeleteDelivery,
   onReturnCourse,
   onDeleteCourse,
+  onUpdateSubject,
 }) => {
   const [filterMode, setFilterMode] = useState<'active' | 'all'>('active');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCourse, setSelectedCourse] = useState('');
   const [onlyMyDeliveries, setOnlyMyDeliveries] = useState<boolean>(currentUser?.role === 'profesor');
+
+  // Edit subject modal state
+  const [editingSubjectDelivery, setEditingSubjectDelivery] = useState<DeliveryRecord | null>(null);
 
   // In-app confirmation states
   const [deleteConfirmDelivery, setDeleteConfirmDelivery] = useState<DeliveryRecord | null>(null);
@@ -343,6 +350,21 @@ export const BorrowedPCsModal: React.FC<BorrowedPCsModalProps> = ({
                 </button>
               )}
 
+              {onUpdateSubject && displayedDeliveries.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const firstDelivery = displayedDeliveries[0];
+                    if (firstDelivery) setEditingSubjectDelivery(firstDelivery);
+                  }}
+                  className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-600 hover:bg-blue-500 text-white cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors"
+                  title="Cambiar materia en caso de equivocación"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>Cambiar Materia</span>
+                </button>
+              )}
+
               {onDeleteCourse && (
                 <button
                   type="button"
@@ -495,7 +517,21 @@ export const BorrowedPCsModal: React.FC<BorrowedPCsModalProps> = ({
 
                       <td className="py-2.5 px-3 text-slate-700 dark:text-slate-300">
                         <div className="font-medium">{delivery.teacherName}</div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400">{delivery.subjectName}</div>
+                        <div className="flex items-center gap-1 group">
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[130px]" title={delivery.subjectName}>
+                            {delivery.subjectName}
+                          </span>
+                          {onUpdateSubject && (
+                            <button
+                              type="button"
+                              onClick={() => setEditingSubjectDelivery(delivery)}
+                              className="opacity-70 group-hover:opacity-100 p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-opacity cursor-pointer shrink-0"
+                              title="Editar nombre de la materia (en caso de equivocación)"
+                            >
+                              <Pencil className="w-2.5 h-2.5" />
+                            </button>
+                          )}
+                        </div>
                       </td>
 
                       <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400 whitespace-nowrap">
@@ -564,6 +600,16 @@ export const BorrowedPCsModal: React.FC<BorrowedPCsModalProps> = ({
                             >
                               <Mouse className="w-3 h-3 fill-current" />
                               <span>{delivery.includesMouse ? 'Mouse' : '+ Mouse'}</span>
+                            </button>
+                          )}
+                          {onUpdateSubject && (
+                            <button
+                              type="button"
+                              onClick={() => setEditingSubjectDelivery(delivery)}
+                              title="Editar materia asignada (en caso de equivocación)"
+                              className="p-1 rounded-md text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors cursor-pointer"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
                             </button>
                           )}
                           {delivery.status === 'activo' && onReturnDelivery && (
@@ -703,6 +749,19 @@ export const BorrowedPCsModal: React.FC<BorrowedPCsModalProps> = ({
             console.error('Error al devolver curso:', err);
           } finally {
             setIsProcessingAction(false);
+          }
+        }}
+      />
+
+      {/* MODAL: Corregir / Cambiar nombre de materia en caso de equivocación */}
+      <EditSubjectModal
+        isOpen={!!editingSubjectDelivery}
+        onClose={() => setEditingSubjectDelivery(null)}
+        delivery={editingSubjectDelivery}
+        allDeliveries={deliveries}
+        onSave={async (id, newSubj, wholeCourse) => {
+          if (onUpdateSubject) {
+            await onUpdateSubject(id, newSubj, wholeCourse);
           }
         }}
       />

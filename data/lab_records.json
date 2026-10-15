@@ -235,8 +235,8 @@
       "status": "disponible",
       "locationRow": "Fila C - Puesto 05",
       "lastMaintenanceDate": "2026-09-01T08:00:00.000Z",
-      "totalLoansCount": 1,
-      "totalUsageHours": 4,
+      "totalLoansCount": 2,
+      "totalUsageHours": 4.5,
       "healthScore": 100,
       "notes": "Equipo verificado y listo para programación"
     },
@@ -283,7 +283,7 @@
       "status": "disponible",
       "locationRow": "Fila D - Puesto 03",
       "lastMaintenanceDate": "2026-09-01T08:00:00.000Z",
-      "totalLoansCount": 1,
+      "totalLoansCount": 2,
       "totalUsageHours": 4,
       "healthScore": 100,
       "notes": "Equipo verificado y listo para programación"
@@ -930,6 +930,29 @@
       "includesMouse": false,
       "mouseReturned": true,
       "registeredBy": "Encargado de Laboratorio"
+    },
+    {
+      "id": "DEL-2026-020",
+      "pcNumber": "PC-20",
+      "computerId": "PC-20",
+      "studentName": "Gomez Valentino",
+      "studentId": "4º Año I",
+      "studentCareer": "Programación I",
+      "teacherName": "Bringas Santiago",
+      "subjectName": "Arquitectura de Computadoras y Hardware",
+      "deliveryDate": "2026-09-28T08:00:00.000Z",
+      "expectedReturnTime": "2026-09-28T12:00:00.000Z",
+      "returnDate": "2026-09-28T12:00:00.000Z",
+      "status": "devuelto_bien",
+      "observations": "Equipo entregado en condiciones óptimas. Sin daños previos detectados.",
+      "returnObservations": "Devolución completa en óptimas condiciones al finalizar la clase.",
+      "reportedDamageOnReturn": false,
+      "includesCharger": true,
+      "chargerNumber": "Cargador 20",
+      "chargerReturned": true,
+      "includesMouse": false,
+      "mouseReturned": true,
+      "registeredBy": "Encargado de Laboratorio"
     }
   ],
   "incidents": [
@@ -1144,5 +1167,67 @@
       "avatarColor": "from-red-600 to-amber-700"
     }
   ],
-  "lastUpdated": "2026-10-05T17:25:15.695Z"
+  "lastUpdated": "2026-10-15T18:07:30.020Z",
+  "studentsByCourse": {
+    "4º Año I": [
+      "Agudelo Juan Martin",
+      "Aguirre Samuel",
+      "Allende Aguero Benjamin",
+      "Alvarez Gael",
+      "Franco Jazmin",
+      "Franco Jeremias",
+      "Gomez Valentino",
+      "Lazo Fernandez Martina",
+      "Lesta Juan Cruz",
+      "López Lautaro",
+      "Moriconi Octavio",
+      "Palacios Uriel",
+      "Puchi Ludmila",
+      "Reyna Thiago Benjamin",
+      "Robles Luciano",
+      "Romero Benjamin",
+      "Sanchez Ortega",
+      "Soria Ingrid",
+      "Sosa Lapenta Mateo",
+      "Torres Martiniano"
+    ],
+    "5º Año L": [
+      "Acuña Bianca Agostina",
+      "Cano Benjamin",
+      "Chiquilito Lara Jazmin",
+      "Chiquilito Valentina Tiziana",
+      "Ferrero Lola",
+      "Herrera Francisco",
+      "León Antonella",
+      "Moreno Sofia",
+      "Romero Maximo",
+      "Sanchez Sebastián",
+      "Tschinki Jairo",
+      "Valdez Franco"
+    ],
+    "6º Año J": [
+      "Audisio Pablo",
+      "Blanco Santiago",
+      "Bustos Brisa Belen",
+      "Ceballos Enzo",
+      "Choque Facundo",
+      "Córdoba Matias",
+      "Cruces Julian",
+      "Cuello Agustina",
+      "Farias Vacchiano Francesco",
+      "Gigena Marcos",
+      "Gimenez Matias",
+      "Heredia Ariadna Steffi",
+      "Jordan Lara",
+      "Maldonado Benjamin",
+      "Navarro Isaias",
+      "Paez Mendoza",
+      "Passetti Santiago",
+      "Raviche Sofia",
+      "Rojas Ludmila",
+      "Sanchez Lautaro",
+      "Tardino Domingo",
+      "Torres Facundo"
+    ]
+  }
 }

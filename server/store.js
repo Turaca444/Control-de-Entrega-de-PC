@@ -758,6 +758,45 @@ var DatabaseStore = class {
     this.broadcast("delivery_updated", delivery);
     return delivery;
   }
+  updateDeliverySubject(id, payload) {
+    const delivery = this.data.deliveries.find((d) => d.id === id);
+    if (!delivery) return null;
+    const trimmedSubject = payload.newSubjectName.trim();
+    if (!trimmedSubject) return null;
+    let affectedCount = 1;
+    delivery.subjectName = trimmedSubject;
+    if (payload.updateWholeCourse) {
+      const normalizedCourse = delivery.studentId.trim().toLowerCase();
+      const normalizedTeacher = delivery.teacherName.trim().toLowerCase();
+      for (const d of this.data.deliveries) {
+        if (d.id !== delivery.id && d.status === "activo") {
+          const matchCourse = d.studentId.trim().toLowerCase() === normalizedCourse || d.studentId.trim().toLowerCase().includes(normalizedCourse);
+          const matchTeacher = d.teacherName.trim().toLowerCase() === normalizedTeacher;
+          if (matchCourse && matchTeacher) {
+            d.subjectName = trimmedSubject;
+            affectedCount++;
+            this.broadcast("delivery_updated", d);
+          }
+        }
+      }
+    }
+    this.save();
+    this.broadcast("delivery_updated", delivery);
+    return { updated: delivery, affectedCount };
+  }
+  updateDelivery(id, partial) {
+    const delivery = this.data.deliveries.find((d) => d.id === id);
+    if (!delivery) return null;
+    if (partial.subjectName) delivery.subjectName = partial.subjectName.trim();
+    if (partial.studentCareer) delivery.studentCareer = partial.studentCareer.trim();
+    if (partial.observations !== void 0) delivery.observations = partial.observations;
+    if (partial.teacherName) delivery.teacherName = partial.teacherName.trim();
+    if (partial.studentName) delivery.studentName = partial.studentName.trim();
+    if (partial.studentId) delivery.studentId = partial.studentId.trim();
+    this.save();
+    this.broadcast("delivery_updated", delivery);
+    return delivery;
+  }
   deleteDelivery(id) {
     const index = this.data.deliveries.findIndex((d) => d.id === id);
     if (index === -1) return false;
@@ -1204,6 +1243,35 @@ var DatabaseStore = class {
       this.save();
     }
     return this.data.studentsByCourse[targetKey];
+  }
+  removeStudentFromCourse(course, studentName) {
+    if (!this.data.studentsByCourse) {
+      this.data.studentsByCourse = {
+        ...STUDENTS_BY_COURSE,
+        "4\xBA A\xF1o I": [...STUDENTS_4_I]
+      };
+    }
+    const cleanName = studentName.trim().toLowerCase();
+    let targetKey = course;
+    const normalized = course.trim().toLowerCase();
+    for (const cName of Object.keys(this.data.studentsByCourse)) {
+      if (cName.toLowerCase() === normalized || cName.toLowerCase().replace(/[^a-z0-9]/g, "") === normalized.replace(/[^a-z0-9]/g, "") || normalized.includes("4") && normalized.includes("i") && cName.includes("4\xBA A\xF1o I")) {
+        targetKey = cName;
+        break;
+      }
+    }
+    if (this.data.studentsByCourse[targetKey]) {
+      this.data.studentsByCourse[targetKey] = this.data.studentsByCourse[targetKey].filter(
+        (s) => s.trim().toLowerCase() !== cleanName
+      );
+      this.save();
+      this.broadcast("students_updated", {
+        course: targetKey,
+        students: this.data.studentsByCourse[targetKey]
+      });
+      return this.data.studentsByCourse[targetKey];
+    }
+    return [];
   }
   resetToDefaults() {
     this.data = {

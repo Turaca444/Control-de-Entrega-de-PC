@@ -22,6 +22,7 @@ import {
   Trash2,
   LogOut,
   Mouse,
+  Pencil,
 } from 'lucide-react';
 import { DeliveryRecord, Computer, PROFESSORS_LIST, SCHOOL_COURSES, UserProfile } from '../types';
 import {
@@ -33,6 +34,7 @@ import { BorrowedPCsModal } from './BorrowedPCsModal';
 import { ConfirmModal } from './ConfirmModal';
 import { AssignChargerModal } from './AssignChargerModal';
 import { AssignMouseModal } from './AssignMouseModal';
+import { EditSubjectModal } from './EditSubjectModal';
 
 interface DeliveriesViewProps {
   deliveries: DeliveryRecord[];
@@ -62,6 +64,7 @@ interface DeliveriesViewProps {
   onDeleteDelivery?: (deliveryId: string) => Promise<void> | void;
   onReturnCourse?: (courseName: string, teacherName?: string) => Promise<void> | void;
   onDeleteCourse?: (courseName: string, teacherName?: string) => Promise<void> | void;
+  onUpdateSubject?: (deliveryId: string, newSubjectName: string, updateWholeCourse: boolean) => Promise<void> | void;
   onRefresh: () => void;
   onLogout?: () => void;
   onOpenLoginModal?: () => void;
@@ -78,6 +81,7 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({
   onDeleteDelivery,
   onReturnCourse,
   onDeleteCourse,
+  onUpdateSubject,
   onRefresh,
   onLogout,
   onOpenLoginModal,
@@ -101,6 +105,9 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({
 
   // Detail preview modal
   const [viewingDetail, setViewingDetail] = useState<DeliveryRecord | null>(null);
+
+  // Edit subject modal state
+  const [editingSubjectDelivery, setEditingSubjectDelivery] = useState<DeliveryRecord | null>(null);
 
   // Borrowed PCs report modal
   const [showBorrowedModal, setShowBorrowedModal] = useState(false);
@@ -708,9 +715,21 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({
 
                       {/* Subject */}
                       <td className="py-3 px-3.5">
-                        <div className="font-medium text-slate-900 dark:text-slate-200 flex items-center gap-1.5">
-                          <BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>{delivery.subjectName}</span>
+                        <div className="flex items-center justify-between gap-1 group">
+                          <div className="font-medium text-slate-900 dark:text-slate-200 flex items-center gap-1.5 truncate">
+                            <BookOpen className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                            <span className="truncate" title={delivery.subjectName}>{delivery.subjectName}</span>
+                          </div>
+                          {onUpdateSubject && (
+                            <button
+                              type="button"
+                              onClick={() => setEditingSubjectDelivery(delivery)}
+                              className="p-1 rounded text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors opacity-70 group-hover:opacity-100 cursor-pointer shrink-0"
+                              title="Editar nombre de la materia (en caso de equivocación)"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
 
@@ -858,6 +877,18 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({
                           >
                             <Eye className="w-4 h-4" />
                           </button>
+
+                          {/* Edit subject in case of mistake */}
+                          {onUpdateSubject && (
+                            <button
+                              type="button"
+                              onClick={() => setEditingSubjectDelivery(delivery)}
+                              className="p-1 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded cursor-pointer transition-colors"
+                              title="Editar materia / Cambiar si hubo equivocación"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          )}
 
                           {/* Delete individual delivery (End of class / cleanup) */}
                           {onDeleteDelivery && (
@@ -1221,21 +1252,39 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({
               )}
             </div>
 
-            <div className="flex justify-between items-center pt-3 border-t border-slate-200 dark:border-slate-700">
-              <button
-                onClick={() => {
-                  const comp = computers.find((c) => c.pcNumber === viewingDetail.pcNumber);
-                  generateDeliveryReceiptPDF(viewingDetail, comp);
-                }}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 cursor-pointer"
-              >
-                <FileDown className="w-4 h-4" />
-                <span>Descargar PDF</span>
-              </button>
+            <div className="flex flex-wrap justify-between items-center gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const comp = computers.find((c) => c.pcNumber === viewingDetail.pcNumber);
+                    generateDeliveryReceiptPDF(viewingDetail, comp);
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <FileDown className="w-4 h-4" />
+                  <span>Descargar PDF</span>
+                </button>
+
+                {onUpdateSubject && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = viewingDetail;
+                      setViewingDetail(null);
+                      setEditingSubjectDelivery(target);
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 flex items-center gap-1.5 cursor-pointer transition-colors"
+                    title="Editar nombre de la materia si hubo una equivocación"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    <span>Editar Materia</span>
+                  </button>
+                )}
+              </div>
 
               <button
                 onClick={() => setViewingDetail(null)}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 cursor-pointer"
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 cursor-pointer transition-colors"
               >
                 Cerrar
               </button>
@@ -1258,6 +1307,7 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({
         onDeleteDelivery={onDeleteDelivery}
         onReturnCourse={onReturnCourse}
         onDeleteCourse={onDeleteCourse}
+        onUpdateSubject={onUpdateSubject}
       />
 
       {/* MODAL: Asignar cargador cuando el estudiante se queda sin carga en su PC */}
@@ -1308,6 +1358,19 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({
             console.error('Error al eliminar registro:', err);
           } finally {
             setIsDeletingDelivery(false);
+          }
+        }}
+      />
+
+      {/* MODAL: Editar / Cambiar nombre de materia en caso de equivocación */}
+      <EditSubjectModal
+        isOpen={!!editingSubjectDelivery}
+        onClose={() => setEditingSubjectDelivery(null)}
+        delivery={editingSubjectDelivery}
+        allDeliveries={deliveries}
+        onSave={async (id, newSubj, wholeCourse) => {
+          if (onUpdateSubject) {
+            await onUpdateSubject(id, newSubj, wholeCourse);
           }
         }}
       />

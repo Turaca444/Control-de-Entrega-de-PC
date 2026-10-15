@@ -48,19 +48,39 @@ async function parseResponseOrThrow<T = any>(res: Response, fallbackError: strin
 export const api = {
   // Stats
   async getStats(): Promise<SystemStats> {
-    const res = await fetch('/api/stats');
+    const res = await fetch(`/api/stats?_t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+    });
     return parseResponseOrThrow(res, 'Error al obtener estadísticas');
   },
 
   // Computers
   async getComputers(status?: string): Promise<Computer[]> {
-    const url = status ? `/api/computers?status=${encodeURIComponent(status)}` : '/api/computers';
-    const res = await fetch(url);
+    const url = status
+      ? `/api/computers?status=${encodeURIComponent(status)}&_t=${Date.now()}`
+      : `/api/computers?_t=${Date.now()}`;
+    const res = await fetch(url, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+    });
     return parseResponseOrThrow(res, 'Error al obtener equipos');
   },
 
   async getAvailableComputers(): Promise<{ count: number; availablePcNumbers: string[]; computers: Computer[] }> {
-    const res = await fetch('/api/computers/available');
+    const res = await fetch(`/api/computers/available?_t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+    });
     return parseResponseOrThrow(res, 'Error al obtener equipos disponibles');
   },
 
@@ -77,7 +97,13 @@ export const api = {
       repairs: RepairRecord[];
     };
   }> {
-    const res = await fetch(`/api/computers/${encodeURIComponent(id)}`);
+    const res = await fetch(`/api/computers/${encodeURIComponent(id)}?_t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+    });
     return parseResponseOrThrow(res, 'Error al obtener detalle del equipo');
   },
 
@@ -115,8 +141,15 @@ export const api = {
     if (params?.pcNumber) query.append('pcNumber', params.pcNumber);
     if (params?.subjectName) query.append('subjectName', params.subjectName);
     if (params?.status) query.append('status', params.status);
+    query.append('_t', Date.now().toString());
 
-    const res = await fetch(`/api/deliveries?${query.toString()}`);
+    const res = await fetch(`/api/deliveries?${query.toString()}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+    });
     return parseResponseOrThrow(res, 'Error al obtener entregas');
   },
 
@@ -612,27 +645,106 @@ export const api = {
     };
   },
 
-  async deleteDelivery(id: string): Promise<boolean> {
+  async updateDeliverySubject(
+    id: string,
+    newSubjectName: string,
+    updateWholeCourse?: boolean
+  ): Promise<{ success: boolean; message: string; delivery: DeliveryRecord; affectedCount: number }> {
+    const cleanSubject = newSubjectName.trim();
+
     try {
-      let res = await fetch(`/api/deliveries/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
+      const res = await fetch(`/api/deliveries/${encodeURIComponent(id)}/subject`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+        body: JSON.stringify({
+          newSubjectName: cleanSubject,
+          updateWholeCourse: Boolean(updateWholeCourse),
+        }),
       });
-      if (!res.ok && (res.status === 404 || res.status === 405)) {
-        res = await fetch(`/api/deliveries/${encodeURIComponent(id)}/delete`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-      if (!res.ok && (res.status === 404 || res.status === 405)) {
-        res = await fetch('/api/deliveries/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id }),
-        });
+
+      if (res.ok) {
+        const data = await res.json();
+        try {
+          const cached = localStorage.getItem('lab_cached_deliveries');
+          if (cached) {
+            const list: DeliveryRecord[] = JSON.parse(cached);
+            const target = list.find((d) => d.id === id);
+            if (target) {
+              target.subjectName = cleanSubject;
+              if (updateWholeCourse) {
+                const normCourse = target.studentId.trim().toLowerCase();
+                const normTeacher = target.teacherName.trim().toLowerCase();
+                list.forEach((d) => {
+                  if (
+                    d.status === 'activo' &&
+                    (d.studentId.trim().toLowerCase() === normCourse || d.studentId.trim().toLowerCase().includes(normCourse)) &&
+                    d.teacherName.trim().toLowerCase() === normTeacher
+                  ) {
+                    d.subjectName = cleanSubject;
+                  }
+                });
+              }
+              localStorage.setItem('lab_cached_deliveries', JSON.stringify(list));
+            }
+          }
+        } catch {}
+        return data;
       }
     } catch (e) {
-      console.warn('Backend deleteDelivery failed, applying local removal:', e);
+      console.warn('Backend updateDeliverySubject fallback:', e);
     }
+
+    // Local fallback update
+    let affectedCount = 1;
+    let updatedDelivery: DeliveryRecord | null = null;
+    try {
+      const cached = localStorage.getItem('lab_cached_deliveries');
+      if (cached) {
+        const list: DeliveryRecord[] = JSON.parse(cached);
+        const target = list.find((d) => d.id === id);
+        if (target) {
+          target.subjectName = cleanSubject;
+          updatedDelivery = target;
+          if (updateWholeCourse) {
+            const normCourse = target.studentId.trim().toLowerCase();
+            const normTeacher = target.teacherName.trim().toLowerCase();
+            list.forEach((d) => {
+              if (
+                d.status === 'activo' &&
+                d.id !== id &&
+                (d.studentId.trim().toLowerCase() === normCourse || d.studentId.trim().toLowerCase().includes(normCourse)) &&
+                d.teacherName.trim().toLowerCase() === normTeacher
+              ) {
+                d.subjectName = cleanSubject;
+                affectedCount++;
+              }
+            });
+          }
+          localStorage.setItem('lab_cached_deliveries', JSON.stringify(list));
+        }
+      }
+    } catch {}
+
+    return {
+      success: true,
+      message: `Materia actualizada a "${cleanSubject}" (${affectedCount} registro/s)`,
+      delivery: updatedDelivery || ({ id, subjectName: cleanSubject } as any),
+      affectedCount,
+    };
+  },
+
+  async deleteDelivery(id: string): Promise<boolean> {
+    try {
+      const deleted: string[] = JSON.parse(localStorage.getItem('lab_deleted_deliveries') || '[]');
+      if (!deleted.includes(id)) {
+        deleted.push(id);
+        localStorage.setItem('lab_deleted_deliveries', JSON.stringify(deleted));
+      }
+    } catch {}
 
     try {
       const cached = localStorage.getItem('lab_cached_deliveries');
@@ -643,22 +755,80 @@ export const api = {
       }
     } catch {}
 
+    try {
+      let res = await fetch(`/api/deliveries/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      });
+      if (!res.ok && (res.status === 404 || res.status === 405)) {
+        res = await fetch(`/api/deliveries/${encodeURIComponent(id)}/delete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
+        });
+      }
+      if (!res.ok && (res.status === 404 || res.status === 405)) {
+        res = await fetch('/api/deliveries/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
+          body: JSON.stringify({ id }),
+        });
+      }
+    } catch (e) {
+      console.warn('Backend deleteDelivery failed, applying local removal:', e);
+    }
+
     return true;
   },
 
   async returnCourseDeliveries(course: string, teacherName?: string): Promise<{ success: boolean; count: number }> {
     const res = await fetch('/api/deliveries/return-course', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
       body: JSON.stringify({ course, teacherName }),
     });
     return parseResponseOrThrow(res, 'Error al finalizar clase del curso');
   },
 
   async deleteCourseDeliveries(course: string, teacherName?: string): Promise<{ success: boolean; count: number }> {
+    try {
+      const cached = localStorage.getItem('lab_cached_deliveries');
+      if (cached) {
+        const list: DeliveryRecord[] = JSON.parse(cached);
+        const normalizedCourse = course.trim().toLowerCase();
+        const normalizedTeacher = teacherName ? teacherName.trim().toLowerCase() : null;
+        const matchingIds: string[] = [];
+        const remaining = list.filter((d) => {
+          const matchCourse =
+            d.studentId.trim().toLowerCase() === normalizedCourse ||
+            d.studentId.trim().toLowerCase().includes(normalizedCourse);
+          const matchTeacher =
+            !normalizedTeacher || d.teacherName.trim().toLowerCase() === normalizedTeacher;
+          if (matchCourse && matchTeacher) {
+            matchingIds.push(d.id);
+            return false;
+          }
+          return true;
+        });
+        localStorage.setItem('lab_cached_deliveries', JSON.stringify(remaining));
+
+        const deleted: string[] = JSON.parse(localStorage.getItem('lab_deleted_deliveries') || '[]');
+        matchingIds.forEach((id) => {
+          if (!deleted.includes(id)) deleted.push(id);
+        });
+        localStorage.setItem('lab_deleted_deliveries', JSON.stringify(deleted));
+      }
+    } catch {}
+
     const res = await fetch('/api/deliveries/delete-course', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
       body: JSON.stringify({ course, teacherName }),
     });
     return parseResponseOrThrow(res, 'Error al eliminar alumnos del curso de la planilla');
@@ -666,8 +836,14 @@ export const api = {
 
   // Incidents
   async getIncidents(pcNumber?: string): Promise<IncidentRecord[]> {
-    const query = pcNumber ? `?pcNumber=${encodeURIComponent(pcNumber)}` : '';
-    const res = await fetch(`/api/incidents${query}`);
+    const query = pcNumber ? `?pcNumber=${encodeURIComponent(pcNumber)}&_t=${Date.now()}` : `?_t=${Date.now()}`;
+    const res = await fetch(`/api/incidents${query}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+    });
     return parseResponseOrThrow(res, 'Error al obtener incidencias');
   },
 
@@ -784,8 +960,14 @@ export const api = {
 
   // Repairs
   async getRepairs(pcNumber?: string): Promise<RepairRecord[]> {
-    const query = pcNumber ? `?pcNumber=${encodeURIComponent(pcNumber)}` : '';
-    const res = await fetch(`/api/repairs${query}`);
+    const query = pcNumber ? `?pcNumber=${encodeURIComponent(pcNumber)}&_t=${Date.now()}` : `?_t=${Date.now()}`;
+    const res = await fetch(`/api/repairs${query}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+    });
     return parseResponseOrThrow(res, 'Error al obtener reparaciones');
   },
 
@@ -973,7 +1155,13 @@ export const api = {
 
   // Maintenance Alerts
   async getMaintenanceAlerts(): Promise<MaintenanceAlert[]> {
-    const res = await fetch('/api/maintenance/alerts');
+    const res = await fetch(`/api/maintenance/alerts?_t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+    });
     return parseResponseOrThrow(res, 'Error al obtener alertas de mantenimiento');
   },
 
@@ -997,7 +1185,13 @@ export const api = {
 
   // Notifications
   async getNotifications(): Promise<AdminNotification[]> {
-    const res = await fetch('/api/notifications');
+    const res = await fetch(`/api/notifications?_t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+    });
     return parseResponseOrThrow(res, 'Error al obtener notificaciones');
   },
 
@@ -1024,7 +1218,13 @@ export const api = {
 
   // Users & Profiles
   async getUsers(): Promise<UserProfile[]> {
-    const res = await fetch('/api/users');
+    const res = await fetch(`/api/users?_t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+    });
     return parseResponseOrThrow(res, 'Error al obtener lista de docentes');
   },
 
@@ -1168,8 +1368,14 @@ export const api = {
   // Students & Course Rosters
   async getStudents(course?: string): Promise<Record<string, string[]> | string[]> {
     try {
-      const query = course ? `?course=${encodeURIComponent(course)}` : '';
-      const res = await fetch(`/api/students${query}`);
+      const query = course ? `?course=${encodeURIComponent(course)}&_t=${Date.now()}` : `?_t=${Date.now()}`;
+      const res = await fetch(`/api/students${query}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      });
       if (res.ok) {
         return await parseResponseOrThrow(res, 'Error al obtener alumnos');
       }
@@ -1185,7 +1391,7 @@ export const api = {
     try {
       const res = await fetch('/api/students', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
         body: JSON.stringify({ course, studentName }),
       });
       if (res.ok) {
@@ -1193,6 +1399,22 @@ export const api = {
       }
     } catch (e) {
       console.warn('Backend addStudent fallback:', e);
+    }
+    return { success: true, course, studentName };
+  },
+
+  async removeStudent(course: string, studentName: string): Promise<any> {
+    try {
+      const res = await fetch('/api/students', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
+        body: JSON.stringify({ course, studentName }),
+      });
+      if (res.ok) {
+        return await parseResponseOrThrow(res, 'Error al eliminar estudiante');
+      }
+    } catch (e) {
+      console.warn('Backend removeStudent fallback:', e);
     }
     return { success: true, course, studentName };
   },

@@ -1459,14 +1459,25 @@ export const NewDeliveryModal: React.FC<NewDeliveryModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                  Nombre de la Materia / Asignatura *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400">
+                    Nombre de la Materia / Asignatura *
+                  </label>
+                  {subjectName && (
+                    <button
+                      type="button"
+                      onClick={() => setSubjectName('')}
+                      className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                    >
+                      Limpiar / Cambiar
+                    </button>
+                  )}
+                </div>
                 <input
                   type="text"
                   value={subjectName}
                   onChange={(e) => setSubjectName(e.target.value)}
-                  placeholder="Ej. Estructura de Datos"
+                  placeholder="Ej. Programación I o Informática Aplicada"
                   list="subjects-datalist"
                   className="w-full text-xs sm:text-sm p-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
                   required
@@ -1476,6 +1487,22 @@ export const NewDeliveryModal: React.FC<NewDeliveryModalProps> = ({
                     <option key={s} value={s} />
                   ))}
                 </datalist>
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {COMMON_SUBJECTS.slice(0, 6).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setSubjectName(s)}
+                      className={`text-[10px] px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                        subjectName === s
+                          ? 'bg-blue-600 text-white border-blue-600 font-semibold'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

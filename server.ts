@@ -23,6 +23,15 @@ async function startServer() {
     next();
   });
 
+  // Ensure no stale caching on API responses across all environments
+  app.use('/api', (req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+    next();
+  });
+
   // --- REST API ENDPOINTS ---
 
   // 1. Health check & API specification
@@ -372,6 +381,45 @@ async function startServer() {
   app.delete('/api/deliveries/:id/mouse', handleRemoveMouse);
   app.post('/api/deliveries/:id/mouse', handleRemoveMouse);
   app.post('/api/deliveries/remove-mouse', handleRemoveMouse);
+
+  // Update subject (materia) of delivery or whole active course
+  const handleUpdateSubjectRoute = (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const id = req.params.id || req.body.id || req.body.deliveryId;
+    const { newSubjectName, subjectName, updateWholeCourse } = req.body;
+    const finalSubject = (newSubjectName || subjectName || '').trim();
+
+    if (!id) return res.status(400).json({ error: 'ID de préstamo requerido' });
+    if (!finalSubject) return res.status(400).json({ error: 'Debe especificar el nuevo nombre de la materia' });
+
+    const result = dbStore.updateDeliverySubject(id, {
+      newSubjectName: finalSubject,
+      updateWholeCourse: Boolean(updateWholeCourse),
+    });
+
+    if (!result) {
+      return res.status(404).json({ error: 'Préstamo no encontrado' });
+    }
+
+    return res.json({
+      success: true,
+      message: `Materia actualizada a "${finalSubject}" (${result.affectedCount} asignación/es actualizada/s).`,
+      delivery: result.updated,
+      affectedCount: result.affectedCount,
+    });
+  };
+
+  app.put('/api/deliveries/:id/subject', handleUpdateSubjectRoute);
+  app.post('/api/deliveries/:id/subject', handleUpdateSubjectRoute);
+  app.put('/api/deliveries/:id', (req: Request, res: Response) => {
+    if (req.body.newSubjectName || req.body.subjectName) {
+      return handleUpdateSubjectRoute(req, res);
+    }
+    const updated = dbStore.updateDelivery(req.params.id, req.body);
+    if (!updated) return res.status(404).json({ error: 'Préstamo no encontrado' });
+    return res.json(updated);
+  });
+  app.post('/api/deliveries/update-subject', handleUpdateSubjectRoute);
 
   const handleDeleteDeliveryRoute = (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -755,6 +803,16 @@ async function startServer() {
     res.status(201).json({ success: true, course, students: updated });
   });
 
+  app.delete(['/api/students', '/api/courses/students'], (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const { course, studentName } = req.body;
+    if (!course || !studentName) {
+      return res.status(400).json({ error: 'course y studentName son campos requeridos' });
+    }
+    const updated = dbStore.removeStudentFromCourse(course, studentName);
+    res.json({ success: true, course, students: updated });
+  });
+
   // 10. Reset data
   app.post('/api/reset-data', (req: Request, res: Response) => {
     dbStore.resetToDefaults();
@@ -772,7 +830,10 @@ async function startServer() {
     res.write(`event: connected\ndata: ${JSON.stringify({ connected: true, timestamp: Date.now() })}\n\n`);
 
     const unsubscribe = dbStore.subscribeSSE((eventName: string, payload: any) => {
+      // Send named event for addEventListener
       res.write(`event: ${eventName}\ndata: ${JSON.stringify(payload)}\n\n`);
+      // Also send standard message with event type so onmessage handlers receive it seamlessly
+      res.write(`data: ${JSON.stringify({ type: eventName, payload })}\n\n`);
     });
 
     const keepAliveTimer = setInterval(() => {

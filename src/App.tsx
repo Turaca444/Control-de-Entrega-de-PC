@@ -159,9 +159,22 @@ export default function App() {
 
       if (dData && Array.isArray(dData)) {
         setDeliveries((prev) => {
+          let deletedIds = new Set<string>();
+          try {
+            deletedIds = new Set(JSON.parse(localStorage.getItem('lab_deleted_deliveries') || '[]'));
+          } catch {}
           const serverIds = new Set(dData.map((d: DeliveryRecord) => d.id));
-          const localOnly = prev.filter((d) => !serverIds.has(d.id));
-          const merged = [...localOnly, ...dData];
+          // Never resurrect deliveries that are no longer on the server:
+          // only keep genuine newly created offline-only records
+          const localOnly = prev.filter(
+            (d) =>
+              !serverIds.has(d.id) &&
+              !deletedIds.has(d.id) &&
+              d.id.startsWith('DEL-') &&
+              Number(d.id.slice(4)) > 1700000000000
+          );
+          const validServer = dData.filter((d: DeliveryRecord) => !deletedIds.has(d.id));
+          const merged = [...localOnly, ...validServer];
           try {
             localStorage.setItem('lab_cached_deliveries', JSON.stringify(merged));
           } catch {}
@@ -260,36 +273,85 @@ export default function App() {
           setRealtimeConnected(true);
         };
 
+        const handleServerEvent = (type: string, payload: any) => {
+          if (!type || type === 'connected') return;
+
+          if (type === 'delivery_deleted' || type === 'delivery:deleted') {
+            const delId = payload?.id;
+            if (delId) {
+              setDeliveries((prev) => prev.filter((d) => d.id !== delId));
+            }
+            loadAllData();
+          } else if (type === 'course_deliveries_deleted' || type === 'course:deliveries:deleted') {
+            loadAllData();
+          } else if (type === 'delivery_returned' || type === 'delivery:returned') {
+            if (payload?.pcNumber) {
+              showToast('Equipo Devuelto', `Equipo ${payload.pcNumber} devuelto por ${payload.studentName || 'estudiante'}.`, 'success');
+            }
+            loadAllData();
+          } else if (type === 'delivery_created' || type === 'delivery:created') {
+            showToast('Nueva Asignación de PC', `${payload.studentName} ha recibido ${payload.pcNumber} para ${payload.subjectName}.`, 'info');
+            loadAllData();
+          } else if (type === 'incident_created' || type === 'incident:created') {
+            showToast('Alerta de Incidencia / Falla', `Falla en ${payload.pcNumber}: ${payload.description}`, 'warn');
+            triggerBrowserPush(`Alerta en ${payload.pcNumber}`, payload.description);
+            loadAllData();
+          } else if (type === 'incident_deleted' || type === 'incident:deleted') {
+            if (payload?.id) {
+              setIncidents((prev) => prev.filter((i) => i.id !== payload.id));
+            }
+            loadAllData();
+          } else if (type === 'repair_deleted' || type === 'repair:deleted') {
+            if (payload?.id) {
+              setRepairs((prev) => prev.filter((r) => r.id !== payload.id));
+            }
+            loadAllData();
+          } else if (type === 'alert_created' || type === 'alert:created') {
+            showToast('Alerta Mantenimiento Preventivo', `${payload.pcNumber}: ${payload.triggerReason}`, 'warn');
+            triggerBrowserPush(`Mantenimiento Preventivo: ${payload.pcNumber}`, payload.suggestedAction);
+            loadAllData();
+          } else if (type === 'notification_push' || type === 'notification:push' || type === 'push_notification') {
+            triggerBrowserPush(payload.title, payload.message);
+            loadAllData();
+          } else if (type.startsWith('repair_') || type.startsWith('repair:') || type.startsWith('computer_') || type === 'sync') {
+            loadAllData();
+          }
+        };
+
         eventSource.onmessage = (e) => {
           try {
             const data = JSON.parse(e.data);
-            if (data.type === 'connected') return;
-
-            // Handle real-time push events from database store
-            if (data.type === 'delivery:created') {
-              showToast('Nueva Asignación de PC', `${data.payload.studentName} ha recibido ${data.payload.pcNumber} para ${data.payload.subjectName}.`, 'info');
-              loadAllData();
-            } else if (data.type === 'delivery:returned') {
-              showToast('Equipo Devuelto', `Equipo ${data.payload.pcNumber} devuelto por ${data.payload.studentName}.`, 'success');
-              loadAllData();
-            } else if (data.type === 'incident:created') {
-              showToast('Alerta de Incidencia / Falla', `Falla en ${data.payload.pcNumber}: ${data.payload.description}`, 'warn');
-              triggerBrowserPush(`Alerta en ${data.payload.pcNumber}`, data.payload.description);
-              loadAllData();
-            } else if (data.type === 'alert:created') {
-              showToast('Alerta Mantenimiento Preventivo', `${data.payload.pcNumber}: ${data.payload.triggerReason}`, 'warn');
-              triggerBrowserPush(`Mantenimiento Preventivo: ${data.payload.pcNumber}`, data.payload.suggestedAction);
-              loadAllData();
-            } else if (data.type === 'notification:push') {
-              triggerBrowserPush(data.payload.title, data.payload.message);
-              loadAllData();
-            } else if (data.type === 'repair:created' || data.type === 'repair:completed') {
-              loadAllData();
-            }
+            handleServerEvent(data.type, data.payload || data);
           } catch (err) {
-            console.error('Error parsing SSE event:', err);
+            console.error('Error parsing SSE message:', err);
           }
         };
+
+        const sseEvents = [
+          'delivery_deleted',
+          'delivery_returned',
+          'delivery_created',
+          'course_deliveries_deleted',
+          'course_deliveries_returned',
+          'incident_created',
+          'incident_deleted',
+          'repair_created',
+          'repair_updated',
+          'repair_deleted',
+          'computer_updated',
+          'sync',
+        ];
+
+        sseEvents.forEach((evt) => {
+          eventSource?.addEventListener(evt, (e: any) => {
+            try {
+              const payload = JSON.parse(e.data);
+              handleServerEvent(evt, payload);
+            } catch (err) {
+              console.error(`Error parsing SSE event ${evt}:`, err);
+            }
+          });
+        });
 
         eventSource.onerror = () => {
           setRealtimeConnected(false);
@@ -413,10 +475,15 @@ export default function App() {
       setDeliveries((prev) =>
         prev.map((d) => (d.id === deliveryId || d.id === updated.id ? updated : d))
       );
-      loadAllData().catch(() => {});
+      setComputers((prev) =>
+        prev.map((c) =>
+          c.pcNumber === updated.pcNumber ? { ...c, status: 'disponible', currentUser: undefined } : c
+        )
+      );
+      await loadAllData();
       showToast('Devolución Registrada', 'El equipo o periférico ha sido devuelto correctamente.', 'success');
     } catch (err: any) {
-      loadAllData().catch(() => {});
+      await loadAllData().catch(() => {});
       showToast('Devolución Registrada', 'Devolución guardada.', 'info');
     }
   };
@@ -476,9 +543,47 @@ export default function App() {
 
   const handleDeleteDelivery = async (deliveryId: string) => {
     try {
+      const target = deliveries.find((d) => d.id === deliveryId);
+
+      // 1. Optimistic removal from active state immediately
+      setDeliveries((prev) => prev.filter((d) => d.id !== deliveryId));
+
+      // 2. Liberate computer if it was in active use
+      if (target && target.status === 'activo') {
+        setComputers((prev) =>
+          prev.map((c) =>
+            c.pcNumber === target.pcNumber
+              ? { ...c, status: 'disponible', currentUser: undefined }
+              : c
+          )
+        );
+      }
+
+      // 3. Persist to localStorage caches immediately to prevent resurrection
+      try {
+        const cached = localStorage.getItem('lab_cached_deliveries');
+        if (cached) {
+          const list: DeliveryRecord[] = JSON.parse(cached);
+          localStorage.setItem(
+            'lab_cached_deliveries',
+            JSON.stringify(list.filter((d) => d.id !== deliveryId))
+          );
+        }
+        const deleted: string[] = JSON.parse(
+          localStorage.getItem('lab_deleted_deliveries') || '[]'
+        );
+        if (!deleted.includes(deliveryId)) {
+          deleted.push(deliveryId);
+          localStorage.setItem('lab_deleted_deliveries', JSON.stringify(deleted));
+        }
+      } catch {}
+
+      // 4. Call server API
       await api.deleteDelivery(deliveryId);
+
+      // 5. Reload all data to ensure server sync
       await loadAllData();
-      showToast('Registro Eliminado', 'Se eliminó el préstamo de la planilla y se liberó el equipo.', 'info');
+      showToast('Registro Eliminado', 'Se eliminó el estudiante de la planilla y se liberó el equipo.', 'info');
     } catch (err: any) {
       showToast('Error al eliminar', err.message || 'No se pudo eliminar el registro.', 'error');
     }
@@ -486,6 +591,42 @@ export default function App() {
 
   const handleReturnCourse = async (courseName: string, teacherName?: string) => {
     try {
+      const normalizedCourse = courseName.trim().toLowerCase();
+      const normalizedTeacher = teacherName ? teacherName.trim().toLowerCase() : null;
+      const pcNumbersToFree: string[] = [];
+
+      // 1. Optimistic update
+      setDeliveries((prev) =>
+        prev.map((d) => {
+          const matchCourse =
+            d.studentId.trim().toLowerCase() === normalizedCourse ||
+            d.studentId.trim().toLowerCase().includes(normalizedCourse);
+          const matchTeacher =
+            !normalizedTeacher || d.teacherName.trim().toLowerCase() === normalizedTeacher;
+          if (d.status === 'activo' && matchCourse && matchTeacher) {
+            pcNumbersToFree.push(d.pcNumber);
+            return {
+              ...d,
+              status: 'devuelto_bien',
+              returnDate: new Date().toISOString(),
+              returnObservations: `Devuelto al finalizar la clase de ${courseName}.`,
+            };
+          }
+          return d;
+        })
+      );
+
+      if (pcNumbersToFree.length > 0) {
+        setComputers((prev) =>
+          prev.map((c) =>
+            pcNumbersToFree.includes(c.pcNumber)
+              ? { ...c, status: 'disponible', currentUser: undefined }
+              : c
+          )
+        );
+      }
+
+      // 2. Call server API
       const res = await api.returnCourseDeliveries(courseName, teacherName);
       await loadAllData();
       showToast(
@@ -502,13 +643,66 @@ export default function App() {
 
   const handleDeleteCourse = async (courseName: string, teacherName?: string) => {
     try {
+      const normalizedCourse = courseName.trim().toLowerCase();
+      const normalizedTeacher = teacherName ? teacherName.trim().toLowerCase() : null;
+
+      const matchingIds: string[] = [];
+      const pcNumbersToFree: string[] = [];
+
+      deliveries.forEach((d) => {
+        const matchCourse =
+          d.studentId.trim().toLowerCase() === normalizedCourse ||
+          d.studentId.trim().toLowerCase().includes(normalizedCourse);
+        const matchTeacher =
+          !normalizedTeacher || d.teacherName.trim().toLowerCase() === normalizedTeacher;
+        if (matchCourse && matchTeacher) {
+          matchingIds.push(d.id);
+          if (d.status === 'activo') {
+            pcNumbersToFree.push(d.pcNumber);
+          }
+        }
+      });
+
+      // 1. Optimistic removal from state immediately
+      setDeliveries((prev) => prev.filter((d) => !matchingIds.includes(d.id)));
+
+      if (pcNumbersToFree.length > 0) {
+        setComputers((prev) =>
+          prev.map((c) =>
+            pcNumbersToFree.includes(c.pcNumber)
+              ? { ...c, status: 'disponible', currentUser: undefined }
+              : c
+          )
+        );
+      }
+
+      // 2. Persist to localStorage caches immediately
+      try {
+        const cached = localStorage.getItem('lab_cached_deliveries');
+        if (cached) {
+          const list: DeliveryRecord[] = JSON.parse(cached);
+          localStorage.setItem(
+            'lab_cached_deliveries',
+            JSON.stringify(list.filter((d) => !matchingIds.includes(d.id)))
+          );
+        }
+        const deleted: string[] = JSON.parse(
+          localStorage.getItem('lab_deleted_deliveries') || '[]'
+        );
+        matchingIds.forEach((id) => {
+          if (!deleted.includes(id)) deleted.push(id);
+        });
+        localStorage.setItem('lab_deleted_deliveries', JSON.stringify(deleted));
+      } catch {}
+
+      // 3. Call server API
       const res = await api.deleteCourseDeliveries(courseName, teacherName);
       await loadAllData();
       showToast(
         'Curso Finalizado',
         teacherName
           ? `Se eliminaron los registros de tu clase en ${courseName} (Prof. ${teacherName}).`
-          : `Se eliminaron ${res.count || 0} alumnos del curso ${courseName} de la planilla.`,
+          : `Se eliminaron ${res.count || matchingIds.length} alumnos del curso ${courseName} de la planilla.`,
         'info'
       );
     } catch (err: any) {
@@ -559,6 +753,48 @@ export default function App() {
       showToast('Orden Eliminada', 'La orden técnica ha sido eliminada con éxito.', 'info');
     } catch (err: any) {
       showToast('Error al eliminar', err.message || 'No se pudo eliminar la orden técnica.', 'error');
+    }
+  };
+
+  const handleUpdateDeliverySubject = async (
+    deliveryId: string,
+    newSubjectName: string,
+    updateWholeCourse?: boolean
+  ) => {
+    try {
+      const cleanSubject = newSubjectName.trim();
+      const target = deliveries.find((d) => d.id === deliveryId);
+
+      // Optimistic instant UI update
+      setDeliveries((prev) =>
+        prev.map((d) => {
+          if (d.id === deliveryId) {
+            return { ...d, subjectName: cleanSubject };
+          }
+          if (updateWholeCourse && target && d.status === 'activo') {
+            const normCourse = (target.studentId || '').trim().toLowerCase();
+            const normTeacher = (target.teacherName || '').trim().toLowerCase();
+            const matchCourse =
+              (d.studentId || '').trim().toLowerCase() === normCourse ||
+              (d.studentId || '').trim().toLowerCase().includes(normCourse);
+            const matchTeacher = (d.teacherName || '').trim().toLowerCase() === normTeacher;
+            if (matchCourse && matchTeacher) {
+              return { ...d, subjectName: cleanSubject };
+            }
+          }
+          return d;
+        })
+      );
+
+      const res = await api.updateDeliverySubject(deliveryId, cleanSubject, updateWholeCourse);
+      await loadAllData();
+      showToast(
+        'Materia Actualizada',
+        res.message || `Materia modificada a "${cleanSubject}" exitosamente.`,
+        'success'
+      );
+    } catch (err: any) {
+      showToast('Error al editar materia', err.message || 'No se pudo cambiar el nombre de la materia.', 'error');
     }
   };
 
@@ -635,6 +871,7 @@ export default function App() {
                 onDeleteDelivery={handleDeleteDelivery}
                 onReturnCourse={handleReturnCourse}
                 onDeleteCourse={handleDeleteCourse}
+                onUpdateSubject={handleUpdateDeliverySubject}
                 onRefresh={loadAllData}
                 onLogout={handleLogout}
                 onOpenLoginModal={() => setIsLoginModalOpen(true)}
