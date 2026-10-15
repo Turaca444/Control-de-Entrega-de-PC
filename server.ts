@@ -382,54 +382,50 @@ async function startServer() {
   app.post('/api/deliveries/:id/mouse', handleRemoveMouse);
   app.post('/api/deliveries/remove-mouse', handleRemoveMouse);
 
-  // Update subject (materia) of delivery or whole active course
-  const handleUpdateSubjectRoute = (req: Request, res: Response) => {
+  // Update delivery (student name, subject name, course, etc.)
+  const handleUpdateDeliveryRoute = (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     const id = req.params.id || req.body.id || req.body.deliveryId;
-    const { newSubjectName, subjectName, updateWholeCourse } = req.body;
-    const finalSubject = (newSubjectName || subjectName || '').trim();
-
     if (!id) return res.status(400).json({ error: 'ID de préstamo requerido' });
-    if (!finalSubject) return res.status(400).json({ error: 'Debe especificar el nuevo nombre de la materia' });
 
-    const result = dbStore.updateDeliverySubject(id, {
-      newSubjectName: finalSubject,
-      updateWholeCourse: Boolean(updateWholeCourse),
-    });
-
+    const result = dbStore.updateDelivery(id, req.body);
     if (!result) {
       return res.status(404).json({ error: 'Préstamo no encontrado' });
     }
 
+    const studentInfo = result.updated.studentName ? `Alumno: "${result.updated.studentName}"` : '';
+    const subjectInfo = result.updated.subjectName ? `Materia: "${result.updated.subjectName}"` : '';
+    const summary = [studentInfo, subjectInfo].filter(Boolean).join(', ');
+
     return res.json({
       success: true,
-      message: `Materia actualizada a "${finalSubject}" (${result.affectedCount} asignación/es actualizada/s).`,
+      message: `Asignación actualizada exitosamente (${summary}).`,
       delivery: result.updated,
       affectedCount: result.affectedCount,
     });
   };
 
-  app.put('/api/deliveries/:id/subject', handleUpdateSubjectRoute);
-  app.post('/api/deliveries/:id/subject', handleUpdateSubjectRoute);
-  app.put('/api/deliveries/:id', (req: Request, res: Response) => {
-    if (req.body.newSubjectName || req.body.subjectName) {
-      return handleUpdateSubjectRoute(req, res);
-    }
-    const updated = dbStore.updateDelivery(req.params.id, req.body);
-    if (!updated) return res.status(404).json({ error: 'Préstamo no encontrado' });
-    return res.json(updated);
-  });
-  app.post('/api/deliveries/update-subject', handleUpdateSubjectRoute);
+  app.put('/api/deliveries/:id/subject', handleUpdateDeliveryRoute);
+  app.post('/api/deliveries/:id/subject', handleUpdateDeliveryRoute);
+  app.put('/api/deliveries/:id', handleUpdateDeliveryRoute);
+  app.post('/api/deliveries/:id', handleUpdateDeliveryRoute);
+  app.post('/api/deliveries/:id/update', handleUpdateDeliveryRoute);
+  app.post('/api/deliveries/update', handleUpdateDeliveryRoute);
+  app.post('/api/deliveries/update-subject', handleUpdateDeliveryRoute);
 
   const handleDeleteDeliveryRoute = (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     const id = req.params.id || req.body.id || req.body.deliveryId;
     if (!id) return res.status(400).json({ error: 'ID de préstamo requerido' });
     const success = dbStore.deleteDelivery(id);
-    if (!success) {
-      return res.status(404).json({ error: 'Préstamo no encontrado' });
-    }
-    return res.json({ success: true, message: 'Registro de préstamo eliminado de la planilla' });
+    return res.json({
+      success: true,
+      message: success
+        ? 'Registro de préstamo eliminado de la planilla'
+        : 'Registro ya no existía en la base de datos o fue removido',
+    });
   };
 
   app.delete('/api/deliveries/:id', handleDeleteDeliveryRoute);

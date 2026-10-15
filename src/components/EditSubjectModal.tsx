@@ -1,13 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, X, Check, AlertCircle, Laptop, User, GraduationCap, Sparkles } from 'lucide-react';
-import { DeliveryRecord } from '../types';
+import {
+  BookOpen,
+  X,
+  Check,
+  AlertCircle,
+  Laptop,
+  User,
+  GraduationCap,
+  Sparkles,
+  Pencil,
+} from 'lucide-react';
+import {
+  DeliveryRecord,
+  SCHOOL_COURSES,
+  getStoredStudentsByCourse,
+} from '../types';
 
-interface EditSubjectModalProps {
+export interface EditSubjectModalProps {
   isOpen: boolean;
   onClose: () => void;
   delivery: DeliveryRecord | null;
   allDeliveries?: DeliveryRecord[];
-  onSave: (deliveryId: string, newSubjectName: string, updateWholeCourse: boolean) => Promise<void>;
+  onSave: (
+    deliveryId: string,
+    newSubjectName: string,
+    updateWholeCourse: boolean,
+    newStudentName?: string,
+    newCourse?: string,
+    newObservations?: string
+  ) => Promise<void>;
 }
 
 const COMMON_SUBJECT_SUGGESTIONS = [
@@ -36,20 +57,38 @@ export const EditSubjectModal: React.FC<EditSubjectModalProps> = ({
   allDeliveries = [],
   onSave,
 }) => {
+  const [studentName, setStudentName] = useState('');
   const [subjectName, setSubjectName] = useState('');
+  const [course, setCourse] = useState('');
+  const [observations, setObservations] = useState('');
   const [updateWholeCourse, setUpdateWholeCourse] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // Course students map
+  const [studentsMap, setStudentsMap] = useState<Record<string, string[]>>({});
+
+  useEffect(() => {
+    if (isOpen) {
+      setStudentsMap(getStoredStudentsByCourse());
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     if (delivery) {
+      setStudentName(delivery.studentName || '');
       setSubjectName(delivery.subjectName || '');
+      setCourse(delivery.studentId || '');
+      setObservations(delivery.observations || '');
       setError('');
       setUpdateWholeCourse(true);
     }
   }, [delivery]);
 
   if (!isOpen || !delivery) return null;
+
+  // Active course students for autocomplete
+  const currentCourseStudents = course ? studentsMap[course] || [] : [];
 
   // Calculate other active deliveries in the same course/class
   const normalizedCourse = (delivery.studentId || '').trim().toLowerCase();
@@ -65,8 +104,15 @@ export const EditSubjectModal: React.FC<EditSubjectModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const clean = subjectName.trim();
-    if (!clean) {
+    const cleanSubject = subjectName.trim();
+    const cleanStudent = studentName.trim();
+
+    if (!cleanStudent) {
+      setError('Por favor ingresa o selecciona el nombre del estudiante.');
+      return;
+    }
+
+    if (!cleanSubject) {
       setError('Por favor ingresa o selecciona un nombre para la materia.');
       return;
     }
@@ -74,33 +120,43 @@ export const EditSubjectModal: React.FC<EditSubjectModalProps> = ({
     try {
       setIsSaving(true);
       setError('');
-      await onSave(delivery.id, clean, updateWholeCourse && sameCourseActiveDeliveries.length > 0);
+      await onSave(
+        delivery.id,
+        cleanSubject,
+        updateWholeCourse && sameCourseActiveDeliveries.length > 0,
+        cleanStudent,
+        course.trim() || delivery.studentId,
+        observations.trim()
+      );
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Error al actualizar la materia.');
+      setError(err.message || 'Error al actualizar la asignación.');
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto"
+      onClick={onClose}
+    >
       <div
-        className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-lg w-full border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col"
+        className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-lg w-full border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-700/80 flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-850">
+        <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-700/80 flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-850 dark:to-slate-800">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-blue-600 text-white shadow-xs">
-              <BookOpen className="w-5 h-5" />
+              <Pencil className="w-5 h-5" />
             </div>
             <div>
               <h3 className="font-bold text-base text-slate-900 dark:text-white">
-                Corregir Nombre de Materia
+                Editar Asignación de PC
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Cambia la materia asignada en caso de equivocación
+                Corrige el estudiante o la materia en caso de equivocación
               </p>
             </div>
           </div>
@@ -115,7 +171,7 @@ export const EditSubjectModal: React.FC<EditSubjectModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[82vh] overflow-y-auto">
           {error && (
             <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900/60 text-rose-800 dark:text-rose-300 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -126,7 +182,7 @@ export const EditSubjectModal: React.FC<EditSubjectModalProps> = ({
           {/* Current Assignment Summary Card */}
           <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-750 text-xs space-y-2">
             <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
-              <span>Datos del Préstamo Activo</span>
+              <span>Datos del Registro</span>
               <span className="font-mono text-slate-700 dark:text-slate-300">{delivery.id}</span>
             </div>
             <div className="grid grid-cols-2 gap-2 pt-1 text-slate-700 dark:text-slate-300">
@@ -135,40 +191,93 @@ export const EditSubjectModal: React.FC<EditSubjectModalProps> = ({
                 <span className="font-bold text-slate-900 dark:text-white">{delivery.pcNumber}</span>
               </div>
               <div className="flex items-center gap-1.5 truncate">
-                <User className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span className="truncate">{delivery.studentName}</span>
-              </div>
-              <div className="flex items-center gap-1.5 truncate">
                 <GraduationCap className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                <span>{delivery.studentId}</span>
+                <span>Docente: <strong className="text-slate-900 dark:text-white">{delivery.teacherName}</strong></span>
               </div>
-              <div className="truncate text-slate-500 dark:text-slate-400">
-                Prof. <span className="font-medium text-slate-700 dark:text-slate-300">{delivery.teacherName}</span>
-              </div>
-            </div>
-            <div className="pt-1.5 border-t border-slate-200 dark:border-slate-800 text-[11px] flex items-center justify-between">
-              <span className="text-slate-500 dark:text-slate-400">Materia actual:</span>
-              <span className="font-semibold text-rose-600 dark:text-rose-400 line-through truncate max-w-[220px]">
-                {delivery.subjectName || '(Sin materia)'}
-              </span>
             </div>
           </div>
 
-          {/* New Subject Input */}
+          {/* 1. Edit Student Name */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                Nombre del Estudiante / Alumno *
+              </label>
+              {currentCourseStudents.length > 0 && (
+                <span className="text-[11px] text-blue-600 dark:text-blue-400">
+                  {currentCourseStudents.length} alumnos en nómina
+                </span>
+              )}
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                required
+                value={studentName}
+                onChange={(e) => setStudentName(e.target.value)}
+                placeholder="Ej. Gómez Valentino"
+                list="edit-students-course-suggestions"
+                className="w-full text-sm py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-medium"
+              />
+              <datalist id="edit-students-course-suggestions">
+                {currentCourseStudents.map((st) => (
+                  <option key={st} value={st} />
+                ))}
+              </datalist>
+            </div>
+            {currentCourseStudents.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1 max-h-20 overflow-y-auto pr-1">
+                <span className="text-[10px] text-slate-400 self-center mr-1">Rápido:</span>
+                {currentCourseStudents.slice(0, 6).map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => setStudentName(st)}
+                    className={`text-[10.5px] px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                      studentName === st
+                        ? 'bg-emerald-600 text-white border-emerald-600 font-semibold'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {st}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 2. Edit Course / Division */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              Nuevo Nombre de la Materia / Asignatura *
+              Curso / División
+            </label>
+            <select
+              value={course}
+              onChange={(e) => setCourse(e.target.value)}
+              className="w-full text-xs sm:text-sm p-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden cursor-pointer"
+            >
+              {SCHOOL_COURSES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 3. Edit Subject Name */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+              Nombre de la Materia / Asignatura *
             </label>
             <div className="relative">
               <input
                 type="text"
-                autoFocus
                 required
                 value={subjectName}
                 onChange={(e) => setSubjectName(e.target.value)}
                 placeholder="Ej. Programación II o Informática Aplicada"
                 list="edit-subjects-suggestions"
-                className="w-full text-sm py-2.5 px-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium"
+                className="w-full text-sm py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-medium"
               />
               <datalist id="edit-subjects-suggestions">
                 {COMMON_SUBJECT_SUGGESTIONS.map((subj) => (
@@ -178,13 +287,13 @@ export const EditSubjectModal: React.FC<EditSubjectModalProps> = ({
             </div>
           </div>
 
-          {/* Quick Suggestions Chips */}
+          {/* Quick Subject Chips */}
           <div>
             <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
               <Sparkles className="w-3 h-3 text-amber-500" />
-              <span>Sugerencias rápidas de materias:</span>
+              <span>Sugerencias de materias:</span>
             </div>
-            <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
+            <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
               {COMMON_SUBJECT_SUGGESTIONS.slice(0, 10).map((subj) => (
                 <button
                   key={subj}
@@ -202,7 +311,7 @@ export const EditSubjectModal: React.FC<EditSubjectModalProps> = ({
             </div>
           </div>
 
-          {/* Option: Update whole course if multiple students active */}
+          {/* 4. Option: Update whole course subject */}
           {sameCourseActiveDeliveries.length > 0 && (
             <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50">
               <label className="flex items-start gap-2.5 cursor-pointer">
@@ -210,11 +319,11 @@ export const EditSubjectModal: React.FC<EditSubjectModalProps> = ({
                   type="checkbox"
                   checked={updateWholeCourse}
                   onChange={(e) => setUpdateWholeCourse(e.target.checked)}
-                  className="mt-0.5 rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                  className="mt-0.5 rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                 />
                 <div className="text-xs">
                   <span className="font-bold text-slate-900 dark:text-white block">
-                    Aplicar cambio también al resto del curso ({delivery.studentId})
+                    Aplicar materia también al resto del curso ({delivery.studentId})
                   </span>
                   <span className="text-slate-600 dark:text-slate-400 text-[11px] block mt-0.5">
                     Modificar la materia a los otros <strong>{sameCourseActiveDeliveries.length}</strong> alumnos activos de esta misma clase con {delivery.teacherName}.
@@ -236,7 +345,7 @@ export const EditSubjectModal: React.FC<EditSubjectModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSaving || !subjectName.trim()}
+              disabled={isSaving || !studentName.trim() || !subjectName.trim()}
               className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/20 transition-all cursor-pointer disabled:opacity-50"
             >
               {isSaving ? (
@@ -247,7 +356,7 @@ export const EditSubjectModal: React.FC<EditSubjectModalProps> = ({
               ) : (
                 <>
                   <Check className="w-4 h-4" />
-                  <span>Guardar Materia Corregida</span>
+                  <span>Guardar Cambios</span>
                 </>
               )}
             </button>
@@ -257,3 +366,5 @@ export const EditSubjectModal: React.FC<EditSubjectModalProps> = ({
     </div>
   );
 };
+
+export const EditDeliveryModal = EditSubjectModal;

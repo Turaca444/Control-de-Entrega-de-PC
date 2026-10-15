@@ -756,20 +756,31 @@ export default function App() {
     }
   };
 
-  const handleUpdateDeliverySubject = async (
+  const handleUpdateDelivery = async (
     deliveryId: string,
     newSubjectName: string,
-    updateWholeCourse?: boolean
+    updateWholeCourse?: boolean,
+    newStudentName?: string,
+    newCourse?: string,
+    newObservations?: string
   ) => {
     try {
       const cleanSubject = newSubjectName.trim();
+      const cleanStudent = newStudentName ? newStudentName.trim() : undefined;
+      const cleanCourse = newCourse ? newCourse.trim() : undefined;
       const target = deliveries.find((d) => d.id === deliveryId);
 
-      // Optimistic instant UI update
+      // 1. Optimistic instant UI update in deliveries
       setDeliveries((prev) =>
         prev.map((d) => {
           if (d.id === deliveryId) {
-            return { ...d, subjectName: cleanSubject };
+            return {
+              ...d,
+              subjectName: cleanSubject || d.subjectName,
+              studentName: cleanStudent || d.studentName,
+              studentId: cleanCourse || d.studentId,
+              observations: newObservations !== undefined ? newObservations : d.observations,
+            };
           }
           if (updateWholeCourse && target && d.status === 'activo') {
             const normCourse = (target.studentId || '').trim().toLowerCase();
@@ -786,16 +797,74 @@ export default function App() {
         })
       );
 
-      const res = await api.updateDeliverySubject(deliveryId, cleanSubject, updateWholeCourse);
+      // 2. If target is active and student name changed, keep computer currentUser in sync
+      if (cleanStudent && target && target.status === 'activo') {
+        setComputers((prev) =>
+          prev.map((c) =>
+            c.pcNumber === target.pcNumber ? { ...c, currentUser: cleanStudent } : c
+          )
+        );
+      }
+
+      // 3. Persist to localStorage immediately
+      try {
+        const cached = localStorage.getItem('lab_cached_deliveries');
+        if (cached) {
+          const list: DeliveryRecord[] = JSON.parse(cached);
+          const t = list.find((d) => d.id === deliveryId);
+          if (t) {
+            if (cleanSubject) t.subjectName = cleanSubject;
+            if (cleanStudent) t.studentName = cleanStudent;
+            if (cleanCourse) t.studentId = cleanCourse;
+            if (newObservations !== undefined) t.observations = newObservations;
+            localStorage.setItem('lab_cached_deliveries', JSON.stringify(list));
+          }
+        }
+      } catch {}
+
+      // 4. Call server API
+      const res = await api.updateDelivery(deliveryId, {
+        subjectName: cleanSubject,
+        newSubjectName: cleanSubject,
+        studentName: cleanStudent,
+        studentId: cleanCourse,
+        observations: newObservations,
+        updateWholeCourse,
+        updateWholeCourseSubject: updateWholeCourse,
+      });
+
       await loadAllData();
       showToast(
-        'Materia Actualizada',
-        res.message || `Materia modificada a "${cleanSubject}" exitosamente.`,
+        'Asignación Actualizada',
+        res.message || 'Se actualizaron los datos de la asignación exitosamente.',
         'success'
       );
     } catch (err: any) {
-      showToast('Error al editar materia', err.message || 'No se pudo cambiar el nombre de la materia.', 'error');
+      showToast('Error al editar', err.message || 'No se pudieron guardar los cambios.', 'error');
     }
+  };
+
+  const handleUpdateDeliverySubject = handleUpdateDelivery;
+
+  const handleUpdateDeliveryData = async (
+    deliveryId: string,
+    data: {
+      newSubjectName?: string;
+      subjectName?: string;
+      studentName?: string;
+      studentId?: string;
+      observations?: string;
+      updateWholeCourse?: boolean;
+    }
+  ) => {
+    return handleUpdateDelivery(
+      deliveryId,
+      data.newSubjectName || data.subjectName || '',
+      data.updateWholeCourse,
+      data.studentName,
+      data.studentId,
+      data.observations
+    );
   };
 
   const handleMarkNotificationRead = async (id: string) => {
@@ -871,7 +940,8 @@ export default function App() {
                 onDeleteDelivery={handleDeleteDelivery}
                 onReturnCourse={handleReturnCourse}
                 onDeleteCourse={handleDeleteCourse}
-                onUpdateSubject={handleUpdateDeliverySubject}
+                onUpdateDelivery={handleUpdateDeliveryData}
+                onUpdateSubject={handleUpdateDelivery}
                 onRefresh={loadAllData}
                 onLogout={handleLogout}
                 onOpenLoginModal={() => setIsLoginModalOpen(true)}

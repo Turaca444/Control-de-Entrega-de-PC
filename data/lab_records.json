@@ -139,8 +139,8 @@
       "status": "disponible",
       "locationRow": "Fila B - Puesto 04",
       "lastMaintenanceDate": "2026-09-01T08:00:00.000Z",
-      "totalLoansCount": 1,
-      "totalUsageHours": 4,
+      "totalLoansCount": 2,
+      "totalUsageHours": 4.5,
       "healthScore": 100,
       "notes": "Equipo verificado y listo para programación"
     },
@@ -1167,7 +1167,7 @@
       "avatarColor": "from-red-600 to-amber-700"
     }
   ],
-  "lastUpdated": "2026-10-15T18:07:30.020Z",
+  "lastUpdated": "2026-10-15T18:28:39.738Z",
   "studentsByCourse": {
     "4º Año I": [
       "Agudelo Juan Martin",

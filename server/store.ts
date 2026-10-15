@@ -759,25 +759,93 @@ export class DatabaseStore {
 
   public updateDelivery(
     id: string,
-    partial: Partial<DeliveryRecord>
-  ): DeliveryRecord | null {
-    const delivery = this.data.deliveries.find((d) => d.id === id);
+    partial: Partial<DeliveryRecord> & {
+      newSubjectName?: string;
+      updateWholeCourse?: boolean;
+      updateWholeCourseSubject?: boolean;
+    }
+  ): { updated: DeliveryRecord; affectedCount: number } | null {
+    const cleanId = String(id || '').trim();
+    const delivery = this.data.deliveries.find(
+      (d) => d.id === cleanId || String(d.id).trim() === cleanId
+    );
     if (!delivery) return null;
 
-    if (partial.subjectName) delivery.subjectName = partial.subjectName.trim();
-    if (partial.studentCareer) delivery.studentCareer = partial.studentCareer.trim();
-    if (partial.observations !== undefined) delivery.observations = partial.observations;
-    if (partial.teacherName) delivery.teacherName = partial.teacherName.trim();
-    if (partial.studentName) delivery.studentName = partial.studentName.trim();
-    if (partial.studentId) delivery.studentId = partial.studentId.trim();
+    let affectedCount = 1;
+
+    // 1. Update student name
+    if (partial.studentName && partial.studentName.trim()) {
+      delivery.studentName = partial.studentName.trim();
+    }
+
+    // 2. Update student ID / Course
+    if (partial.studentId && partial.studentId.trim()) {
+      delivery.studentId = partial.studentId.trim();
+    }
+
+    // 3. Update career
+    if (partial.studentCareer !== undefined) {
+      delivery.studentCareer = partial.studentCareer ? partial.studentCareer.trim() : '';
+    }
+
+    // 4. Update teacher
+    if (partial.teacherName && partial.teacherName.trim()) {
+      delivery.teacherName = partial.teacherName.trim();
+    }
+
+    // 5. Update observations
+    if (partial.observations !== undefined) {
+      delivery.observations = partial.observations;
+    }
+
+    // 6. Update subject name (individual or whole course)
+    const rawSubject = partial.newSubjectName || partial.subjectName;
+    if (rawSubject && rawSubject.trim()) {
+      const trimmedSubject = rawSubject.trim();
+      delivery.subjectName = trimmedSubject;
+
+      const shouldUpdateWholeCourse = Boolean(
+        partial.updateWholeCourse || partial.updateWholeCourseSubject
+      );
+
+      if (shouldUpdateWholeCourse) {
+        const normalizedCourse = delivery.studentId.trim().toLowerCase();
+        const normalizedTeacher = delivery.teacherName.trim().toLowerCase();
+        for (const d of this.data.deliveries) {
+          if (d.id !== delivery.id && d.status === 'activo') {
+            const matchCourse =
+              d.studentId.trim().toLowerCase() === normalizedCourse ||
+              d.studentId.trim().toLowerCase().includes(normalizedCourse);
+            const matchTeacher = d.teacherName.trim().toLowerCase() === normalizedTeacher;
+            if (matchCourse && matchTeacher) {
+              d.subjectName = trimmedSubject;
+              affectedCount++;
+              this.broadcast('delivery_updated', d);
+            }
+          }
+        }
+      }
+    }
+
+    // 7. If delivery is active, keep computer currentUser in sync
+    if (delivery.status === 'activo') {
+      const comp = this.getComputerById(delivery.pcNumber);
+      if (comp) {
+        comp.currentUser = delivery.studentName;
+        this.broadcast('computer_updated', comp);
+      }
+    }
 
     this.save();
     this.broadcast('delivery_updated', delivery);
-    return delivery;
+    return { updated: delivery, affectedCount };
   }
 
   public deleteDelivery(id: string): boolean {
-    const index = this.data.deliveries.findIndex((d) => d.id === id);
+    const cleanId = String(id || '').trim();
+    const index = this.data.deliveries.findIndex(
+      (d) => d.id === cleanId || String(d.id).trim() === cleanId
+    );
     if (index === -1) return false;
 
     const delivery = this.data.deliveries[index];
@@ -785,13 +853,15 @@ export class DatabaseStore {
       const comp = this.getComputerById(delivery.pcNumber);
       if (comp && comp.status === 'en_uso') {
         comp.status = 'disponible';
+        comp.currentUser = undefined;
+        this.broadcast('computer_updated', comp);
       }
     }
 
     this.data.deliveries.splice(index, 1);
     this.evaluateAutomaticMaintenanceAlerts();
     this.save();
-    this.broadcast('delivery_deleted', { id });
+    this.broadcast('delivery_deleted', { id: cleanId });
     return true;
   }
 

@@ -645,15 +645,24 @@ export const api = {
     };
   },
 
-  async updateDeliverySubject(
+  async updateDelivery(
     id: string,
-    newSubjectName: string,
-    updateWholeCourse?: boolean
+    data: {
+      studentName?: string;
+      subjectName?: string;
+      newSubjectName?: string;
+      studentId?: string;
+      studentCareer?: string;
+      observations?: string;
+      updateWholeCourse?: boolean;
+      updateWholeCourseSubject?: boolean;
+    }
   ): Promise<{ success: boolean; message: string; delivery: DeliveryRecord; affectedCount: number }> {
-    const cleanSubject = newSubjectName.trim();
+    const cleanStudent = data.studentName ? data.studentName.trim() : undefined;
+    const cleanSubject = (data.newSubjectName || data.subjectName || '').trim();
 
     try {
-      const res = await fetch(`/api/deliveries/${encodeURIComponent(id)}/subject`, {
+      const res = await fetch(`/api/deliveries/${encodeURIComponent(id)}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -661,21 +670,29 @@ export const api = {
           'Pragma': 'no-cache',
         },
         body: JSON.stringify({
-          newSubjectName: cleanSubject,
-          updateWholeCourse: Boolean(updateWholeCourse),
+          ...data,
+          studentName: cleanStudent,
+          subjectName: cleanSubject,
         }),
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const resData = await res.json();
+        // Update local cache immediately
         try {
           const cached = localStorage.getItem('lab_cached_deliveries');
           if (cached) {
             const list: DeliveryRecord[] = JSON.parse(cached);
             const target = list.find((d) => d.id === id);
             if (target) {
-              target.subjectName = cleanSubject;
-              if (updateWholeCourse) {
+              if (cleanStudent) target.studentName = cleanStudent;
+              if (cleanSubject) target.subjectName = cleanSubject;
+              if (data.studentId) target.studentId = data.studentId.trim();
+              if (data.studentCareer !== undefined) target.studentCareer = data.studentCareer;
+              if (data.observations !== undefined) target.observations = data.observations;
+
+              const shouldUpdateCourse = Boolean(data.updateWholeCourse || data.updateWholeCourseSubject);
+              if (shouldUpdateCourse && cleanSubject) {
                 const normCourse = target.studentId.trim().toLowerCase();
                 const normTeacher = target.teacherName.trim().toLowerCase();
                 list.forEach((d) => {
@@ -692,10 +709,10 @@ export const api = {
             }
           }
         } catch {}
-        return data;
+        return resData;
       }
     } catch (e) {
-      console.warn('Backend updateDeliverySubject fallback:', e);
+      console.warn('Backend updateDelivery fallback:', e);
     }
 
     // Local fallback update
@@ -707,9 +724,15 @@ export const api = {
         const list: DeliveryRecord[] = JSON.parse(cached);
         const target = list.find((d) => d.id === id);
         if (target) {
-          target.subjectName = cleanSubject;
+          if (cleanStudent) target.studentName = cleanStudent;
+          if (cleanSubject) target.subjectName = cleanSubject;
+          if (data.studentId) target.studentId = data.studentId.trim();
+          if (data.studentCareer !== undefined) target.studentCareer = data.studentCareer;
+          if (data.observations !== undefined) target.observations = data.observations;
           updatedDelivery = target;
-          if (updateWholeCourse) {
+
+          const shouldUpdateCourse = Boolean(data.updateWholeCourse || data.updateWholeCourseSubject);
+          if (shouldUpdateCourse && cleanSubject) {
             const normCourse = target.studentId.trim().toLowerCase();
             const normTeacher = target.teacherName.trim().toLowerCase();
             list.forEach((d) => {
@@ -731,10 +754,23 @@ export const api = {
 
     return {
       success: true,
-      message: `Materia actualizada a "${cleanSubject}" (${affectedCount} registro/s)`,
-      delivery: updatedDelivery || ({ id, subjectName: cleanSubject } as any),
+      message: `Asignación actualizada correctamente`,
+      delivery: updatedDelivery || ({ id, studentName: cleanStudent, subjectName: cleanSubject } as any),
       affectedCount,
     };
+  },
+
+  async updateDeliverySubject(
+    id: string,
+    newSubjectName: string,
+    updateWholeCourse?: boolean
+  ): Promise<{ success: boolean; message: string; delivery: DeliveryRecord; affectedCount: number }> {
+    return this.updateDelivery(id, {
+      newSubjectName,
+      subjectName: newSubjectName,
+      updateWholeCourse,
+      updateWholeCourseSubject: updateWholeCourse,
+    });
   },
 
   async deleteDelivery(id: string): Promise<boolean> {

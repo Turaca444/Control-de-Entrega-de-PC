@@ -25,6 +25,7 @@ export interface Computer {
   totalUsageHours: number;
   healthScore: number; // 0 - 100
   notes?: string;
+  currentUser?: string;
 }
 
 export interface DeliveryRecord {

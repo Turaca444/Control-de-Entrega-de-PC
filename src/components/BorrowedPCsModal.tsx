@@ -41,7 +41,14 @@ interface BorrowedPCsModalProps {
   onDeleteDelivery?: (deliveryId: string) => Promise<void> | void;
   onReturnCourse?: (courseName: string, teacherName?: string) => Promise<void> | void;
   onDeleteCourse?: (courseName: string, teacherName?: string) => Promise<void> | void;
-  onUpdateSubject?: (deliveryId: string, newSubjectName: string, updateWholeCourse: boolean) => Promise<void> | void;
+  onUpdateSubject?: (
+    deliveryId: string,
+    newSubjectName: string,
+    updateWholeCourse: boolean,
+    newStudentName?: string,
+    newCourse?: string,
+    newObservations?: string
+  ) => Promise<void> | void;
 }
 
 export const BorrowedPCsModal: React.FC<BorrowedPCsModalProps> = ({
@@ -505,10 +512,24 @@ export const BorrowedPCsModal: React.FC<BorrowedPCsModalProps> = ({
                       </td>
 
                       <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-white">
-                        <div>{delivery.studentName}</div>
-                        {delivery.studentCareer && (
-                          <div className="text-[10px] text-slate-400 font-normal">{delivery.studentCareer}</div>
-                        )}
+                        <div className="flex items-center justify-between gap-1 group">
+                          <div>
+                            <div>{delivery.studentName}</div>
+                            {delivery.studentCareer && (
+                              <div className="text-[10px] text-slate-400 font-normal">{delivery.studentCareer}</div>
+                            )}
+                          </div>
+                          {onUpdateSubject && (
+                            <button
+                              type="button"
+                              onClick={() => setEditingSubjectDelivery(delivery)}
+                              className="opacity-70 group-hover:opacity-100 p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-opacity cursor-pointer shrink-0"
+                              title="Editar estudiante o materia asignada"
+                            >
+                              <Pencil className="w-2.5 h-2.5" />
+                            </button>
+                          )}
+                        </div>
                       </td>
 
                       <td className="py-2.5 px-3 text-slate-700 dark:text-slate-300 font-semibold whitespace-nowrap">
@@ -753,15 +774,15 @@ export const BorrowedPCsModal: React.FC<BorrowedPCsModalProps> = ({
         }}
       />
 
-      {/* MODAL: Corregir / Cambiar nombre de materia en caso de equivocación */}
+      {/* MODAL: Corregir / Cambiar nombre de materia o estudiante en caso de equivocación */}
       <EditSubjectModal
         isOpen={!!editingSubjectDelivery}
         onClose={() => setEditingSubjectDelivery(null)}
         delivery={editingSubjectDelivery}
         allDeliveries={deliveries}
-        onSave={async (id, newSubj, wholeCourse) => {
+        onSave={async (id, newSubj, wholeCourse, newStudentName, newCourse, newObs) => {
           if (onUpdateSubject) {
-            await onUpdateSubject(id, newSubj, wholeCourse);
+            await onUpdateSubject(id, newSubj, wholeCourse, newStudentName, newCourse, newObs);
           }
         }}
       />

@@ -209,6 +209,9 @@ export const NewDeliveryModal: React.FC<NewDeliveryModalProps> = ({
     if (studentName === studentToRemove) {
       setStudentName('');
     }
+    api.removeStudent(course, studentToRemove).catch((err) => {
+      console.warn('API removeStudent error:', err);
+    });
   };
 
   const handleClearAllStudentsFromCourse = (course: string) => {
@@ -1279,42 +1282,54 @@ export const NewDeliveryModal: React.FC<NewDeliveryModalProps> = ({
                   {courseStudents.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setIsManualStudentName(!isManualStudentName);
-                        if (!isManualStudentName) setStudentName('');
-                      }}
+                      onClick={() => setIsManualStudentName(!isManualStudentName)}
                       className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-medium cursor-pointer"
                     >
-                      {isManualStudentName ? '← Ver lista de alumnos' : '✎ Escribir a mano'}
+                      {isManualStudentName ? '← Seleccionar de lista' : '✎ Editar / Escribir nombre'}
                     </button>
                   )}
                 </div>
 
                 {courseStudents.length > 0 && !isManualStudentName ? (
-                  <select
-                    id="select-student-name"
-                    value={studentName}
-                    onChange={(e) => {
-                      if (e.target.value === '__manual__') {
-                        setIsManualStudentName(true);
-                        setStudentName('');
-                      } else {
-                        setStudentName(e.target.value);
-                      }
-                    }}
-                    className="w-full text-xs sm:text-sm p-2 rounded-lg border border-blue-400 dark:border-blue-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden cursor-pointer font-medium"
-                    required
-                  >
-                    <option value="">-- Seleccionar estudiante de {studentId} --</option>
-                    {courseStudents.map((st) => (
-                      <option key={st} value={st}>
-                        {st}
-                      </option>
-                    ))}
-                    <option value="__manual__">✎ Escribir otro nombre manualmente...</option>
-                  </select>
+                  <div className="space-y-1.5">
+                    <select
+                      id="select-student-name"
+                      value={studentName}
+                      onChange={(e) => {
+                        if (e.target.value === '__manual__') {
+                          setIsManualStudentName(true);
+                        } else {
+                          setStudentName(e.target.value);
+                        }
+                      }}
+                      className="w-full text-xs sm:text-sm p-2 rounded-lg border border-blue-400 dark:border-blue-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden cursor-pointer font-medium"
+                      required
+                    >
+                      <option value="">-- Seleccionar estudiante de {studentId} --</option>
+                      {courseStudents.map((st) => (
+                        <option key={st} value={st}>
+                          {st}
+                        </option>
+                      ))}
+                      <option value="__manual__">✎ Escribir / Editar nombre a mano...</option>
+                    </select>
+
+                    {studentName && (
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-0.5">
+                        <span className="truncate mr-2">Alumno: <strong className="text-slate-800 dark:text-slate-200">{studentName}</strong></span>
+                        <button
+                          type="button"
+                          onClick={() => setIsManualStudentName(true)}
+                          className="text-blue-600 dark:text-blue-400 hover:underline font-medium cursor-pointer shrink-0 inline-flex items-center gap-0.5"
+                          title="Permite corregir letras o cambiar el nombre del estudiante"
+                        >
+                          <span>✎ Corregir nombre</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 ) : (
-                  <>
+                  <div className="space-y-1">
                     <input
                       type="text"
                       list="course-students-datalist"
@@ -1327,9 +1342,21 @@ export const NewDeliveryModal: React.FC<NewDeliveryModalProps> = ({
                           ? `Nombre del alumno de ${studentId}`
                           : 'Ej. Carlos Mendoza Ruiz'
                       }
-                      className="w-full text-xs sm:text-sm p-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                      className="w-full text-xs sm:text-sm p-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden font-medium"
                       required
                     />
+                    {courseStudents.length > 0 && (
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                        <span className="text-[10px]">Escribe o corrige el nombre libremente</span>
+                        <button
+                          type="button"
+                          onClick={() => setIsManualStudentName(false)}
+                          className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                        >
+                          ← Volver a lista desplegable
+                        </button>
+                      </div>
+                    )}
                     {courseStudents.length > 0 && (
                       <datalist id="course-students-datalist">
                         {courseStudents.map((st) => (
@@ -1337,7 +1364,7 @@ export const NewDeliveryModal: React.FC<NewDeliveryModalProps> = ({
                         ))}
                       </datalist>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
             </div>

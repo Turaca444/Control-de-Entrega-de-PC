@@ -64,7 +64,25 @@ interface DeliveriesViewProps {
   onDeleteDelivery?: (deliveryId: string) => Promise<void> | void;
   onReturnCourse?: (courseName: string, teacherName?: string) => Promise<void> | void;
   onDeleteCourse?: (courseName: string, teacherName?: string) => Promise<void> | void;
-  onUpdateSubject?: (deliveryId: string, newSubjectName: string, updateWholeCourse: boolean) => Promise<void> | void;
+  onUpdateDelivery?: (
+    deliveryId: string,
+    data: {
+      newSubjectName?: string;
+      subjectName?: string;
+      studentName?: string;
+      studentId?: string;
+      observations?: string;
+      updateWholeCourse?: boolean;
+    }
+  ) => Promise<void> | void;
+  onUpdateSubject?: (
+    deliveryId: string,
+    newSubjectName: string,
+    updateWholeCourse: boolean,
+    newStudentName?: string,
+    newCourse?: string,
+    newObservations?: string
+  ) => Promise<void> | void;
   onRefresh: () => void;
   onLogout?: () => void;
   onOpenLoginModal?: () => void;
@@ -81,6 +99,7 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({
   onDeleteDelivery,
   onReturnCourse,
   onDeleteCourse,
+  onUpdateDelivery,
   onUpdateSubject,
   onRefresh,
   onLogout,
@@ -692,15 +711,29 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({
 
                       {/* Student */}
                       <td className="py-3 px-3.5">
-                        <div className="font-semibold text-slate-900 dark:text-white">
-                          {delivery.studentName}
-                        </div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5">
-                          <span className="font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/80 px-1.5 py-0.5 rounded text-[10.5px]">
-                            {delivery.studentId}
-                          </span>
-                          {delivery.studentCareer && (
-                            <span className="truncate max-w-[120px]">• {delivery.studentCareer}</span>
+                        <div className="flex items-center justify-between gap-1 group">
+                          <div>
+                            <div className="font-semibold text-slate-900 dark:text-white">
+                              {delivery.studentName}
+                            </div>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5">
+                              <span className="font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/80 px-1.5 py-0.5 rounded text-[10.5px]">
+                                {delivery.studentId}
+                              </span>
+                              {delivery.studentCareer && (
+                                <span className="truncate max-w-[120px]">• {delivery.studentCareer}</span>
+                              )}
+                            </div>
+                          </div>
+                          {(onUpdateDelivery || onUpdateSubject) && (
+                            <button
+                              type="button"
+                              onClick={() => setEditingSubjectDelivery(delivery)}
+                              className="p-1 rounded text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors opacity-70 group-hover:opacity-100 cursor-pointer shrink-0"
+                              title="Editar estudiante o materia asignada"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
                           )}
                         </div>
                       </td>
@@ -1362,15 +1395,24 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({
         }}
       />
 
-      {/* MODAL: Editar / Cambiar nombre de materia en caso de equivocación */}
+      {/* MODAL: Editar / Cambiar nombre de materia o estudiante en caso de equivocación */}
       <EditSubjectModal
         isOpen={!!editingSubjectDelivery}
         onClose={() => setEditingSubjectDelivery(null)}
         delivery={editingSubjectDelivery}
         allDeliveries={deliveries}
-        onSave={async (id, newSubj, wholeCourse) => {
-          if (onUpdateSubject) {
-            await onUpdateSubject(id, newSubj, wholeCourse);
+        onSave={async (id, newSubj, wholeCourse, newStudentName, newCourse, newObs) => {
+          if (onUpdateDelivery) {
+            await onUpdateDelivery(id, {
+              newSubjectName: newSubj,
+              subjectName: newSubj,
+              studentName: newStudentName,
+              studentId: newCourse,
+              observations: newObs,
+              updateWholeCourse: wholeCourse,
+            });
+          } else if (onUpdateSubject) {
+            await onUpdateSubject(id, newSubj, wholeCourse, newStudentName, newCourse, newObs);
           }
         }}
       />
